@@ -6,6 +6,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const config = new DocumentBuilder()
+    .addBearerAuth()
     .setTitle('Cloud Campus API')
     .setDescription('Cloud Campus REST API')
     .setVersion('1.0')
