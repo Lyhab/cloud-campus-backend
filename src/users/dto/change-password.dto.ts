@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangePasswordDto {
   @ApiProperty({
-    example: 'CurrentPassword123!',
+    example: 'SecurePassword123!',
     description: 'Current password',
     format: 'password',
   })

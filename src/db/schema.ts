@@ -24,9 +24,15 @@ export const users = pgTable('users', {
 
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
 
-  role: varchar('role', { length: 20 }).notNull(),
+  role: varchar('role', {
+    length: 20,
+    enum: ['admin', 'student'],
+  }).notNull(),
 
-  status: varchar('status', { length: 20 }).notNull(),
+  status: varchar('status', {
+    length: 20,
+    enum: ['pending', 'active', 'inactive'],
+  }).notNull(),
 
   profilePhotoUrl: varchar('profile_photo_url', { length: 500 }),
 

@@ -1,6 +1,8 @@
 import 'dotenv/config';
-import { Client } from 'pg';
 import { readFileSync } from 'fs';
+import { Client } from 'pg';
+
+import { seedUsers } from '../src/seeds/users.seed';
 
 async function resetDatabase() {
   const client = new Client({
@@ -9,29 +11,36 @@ async function resetDatabase() {
 
   await client.connect();
 
-  console.log('🗑️ Dropping public schema...');
-  await client.query('DROP SCHEMA public CASCADE;');
-  await client.query('CREATE SCHEMA public;');
+  try {
+    console.log('🗑️ Dropping public schema...');
 
-  console.log('📦 Running migration...');
+    await client.query('DROP SCHEMA public CASCADE;');
+    await client.query('CREATE SCHEMA public;');
 
-  const migration = readFileSync('./drizzle/0000_soft_drax.sql', 'utf8');
+    console.log('📦 Running migration...');
 
-  const statements = migration
-    .split('--> statement-breakpoint')
-    .map((statement) => statement.trim())
-    .filter(Boolean);
+    const migration = readFileSync('./drizzle/0000_soft_drax.sql', 'utf8');
 
-  for (const statement of statements) {
-    await client.query(statement);
+    const statements = migration
+      .split('--> statement-breakpoint')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+
+    for (const statement of statements) {
+      await client.query(statement);
+    }
+
+    console.log('🌱 Seeding users...');
+
+    await seedUsers();
+
+    console.log('✅ Database reset, migrated, and seeded successfully!');
+  } finally {
+    await client.end();
   }
-
-  await client.end();
-
-  console.log('✅ Database reset and migrated successfully!');
 }
 
-resetDatabase().catch((error) => {
+resetDatabase().catch((error: unknown) => {
   console.error('❌ Database reset failed:', error);
   process.exit(1);
 });

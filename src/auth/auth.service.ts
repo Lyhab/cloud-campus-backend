@@ -16,6 +16,7 @@ import {
   SignUpCommand,
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
+  ChangePasswordCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { createHmac } from 'crypto';
@@ -290,6 +291,24 @@ export class AuthService {
       idToken: result.AuthenticationResult?.IdToken,
       expiresIn: result.AuthenticationResult?.ExpiresIn,
       tokenType: result.AuthenticationResult?.TokenType,
+    };
+  }
+
+  async changePassword(
+    accessToken: string,
+    oldPassword: string,
+    newPassword: string,
+  ) {
+    await this.cognitoClient.send(
+      new ChangePasswordCommand({
+        AccessToken: accessToken,
+        PreviousPassword: oldPassword,
+        ProposedPassword: newPassword,
+      }),
+    );
+
+    return {
+      message: 'Password changed successfully.',
     };
   }
 
