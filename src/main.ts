@@ -7,8 +7,16 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Cloud Campus API')
-    .setDescription('Cloud Campus REST API')
+    .setDescription('Cloud Campus API')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'access-token',
+    )
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
