@@ -7,7 +7,9 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -18,6 +20,7 @@ import {
   ApiBody,
   ApiTags,
   ApiBearerAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
 
 import { AdminGuard } from '../auth/guards/admin.guard';
@@ -31,6 +34,7 @@ import { PaginatedUsersDto } from './dto/paginated-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Users')
 @Controller('users')
@@ -64,16 +68,56 @@ export class UsersController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update user profile' })
   @ApiParam({ name: 'userId', type: String, format: 'uuid' })
-  @ApiBody({ type: UpdateUserDto })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        firstName: {
+          type: 'string',
+          example: 'John',
+        },
+        middleName: {
+          type: 'string',
+          nullable: true,
+          example: 'Michael',
+        },
+        lastName: {
+          type: 'string',
+          example: 'Smith',
+        },
+        profilePhoto: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
   @ApiOkResponse({ type: UserDto })
-  @ApiBadRequestResponse({ description: 'Invalid user ID or update request' })
+  @ApiBadRequestResponse({
+    description: 'Invalid user ID or update request',
+  })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @UseInterceptors(FileInterceptor('profilePhoto'))
   updateUser(
     @Param('userId') userId: string,
     @Body() body: UpdateUserDto,
+    @UploadedFile()
+    profilePhoto:
+      | {
+          originalname: string;
+          buffer: Buffer;
+          mimetype: string;
+        }
+      | undefined,
     @Req() request: AuthenticatedRequest,
   ): Promise<UserDto> {
-    return this.usersService.updateUser(userId, request.user.sub, body);
+    return this.usersService.updateUser(
+      userId,
+      request.user.sub,
+      body,
+      profilePhoto,
+    );
   }
 
   @UseGuards(AuthGuard, AdminGuard)

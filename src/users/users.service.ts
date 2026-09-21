@@ -8,6 +8,7 @@ import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 
 import { AuthService } from '../auth/auth.service';
 import { DbService } from '../db/db.service';
+import { S3Service } from '../s3/s3.service';
 
 import { users } from '../db/schema';
 
@@ -23,6 +24,7 @@ export class UsersService {
   constructor(
     private readonly dbService: DbService,
     private readonly authService: AuthService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async listUsers(query: ListUsersQueryDto): Promise<PaginatedUsersDto> {
@@ -128,6 +130,11 @@ export class UsersService {
     userId: string,
     authenticatedUserId: string,
     body: UpdateUserDto,
+    profilePhoto?: {
+      originalname: string;
+      buffer: Buffer;
+      mimetype: string;
+    },
   ): Promise<UserDto> {
     const [requestingUser] = await this.dbService.db
       .select({
@@ -146,7 +153,19 @@ export class UsersService {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    const allowed = ['firstName', 'middleName', 'lastName', 'profilePhotoUrl'];
+    const [existingUser] = await this.dbService.db
+      .select({
+        profilePhotoUrl: users.profilePhotoUrl,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const allowed = ['firstName', 'middleName', 'lastName'];
 
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       throw new BadRequestException('Body must be an object');
@@ -154,13 +173,23 @@ export class UsersService {
 
     const keys = Object.keys(body);
 
-    if (keys.length === 0 || keys.some((key) => !allowed.includes(key))) {
+    if (keys.length === 0 && !profilePhoto) {
       throw new BadRequestException(
-        'Supply at least one supported profile field',
+        'Supply at least one profile field or profile photo',
       );
     }
 
-    const update: UpdateUserDto & { updatedAt: Date } = {
+    if (keys.some((key) => !allowed.includes(key))) {
+      throw new BadRequestException('Supply only supported profile fields');
+    }
+
+    const update: {
+      firstName?: string;
+      middleName?: string | null;
+      lastName?: string;
+      profilePhotoUrl?: string | null;
+      updatedAt: Date;
+    } = {
       updatedAt: new Date(),
     };
 
@@ -181,13 +210,25 @@ export class UsersService {
       update.lastName = this.validateText(body.lastName, 'lastName', 100);
     }
 
-    if ('profilePhotoUrl' in body) {
-      update.profilePhotoUrl = this.validateText(
-        body.profilePhotoUrl,
-        'profilePhotoUrl',
-        500,
-        true,
+    if (profilePhoto) {
+      if (!profilePhoto.mimetype.startsWith('image/')) {
+        throw new BadRequestException('Profile photo must be an image');
+      }
+
+      const key =
+        `profiles/${userId}/` + `${Date.now()}-${profilePhoto.originalname}`;
+
+      await this.s3Service.upload(
+        key,
+        profilePhoto.buffer,
+        profilePhoto.mimetype,
       );
+
+      if (existingUser.profilePhotoUrl) {
+        await this.s3Service.delete(existingUser.profilePhotoUrl);
+      }
+
+      update.profilePhotoUrl = key;
     }
 
     const [user] = await this.dbService.db
