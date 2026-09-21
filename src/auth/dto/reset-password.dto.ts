@@ -5,18 +5,18 @@ export class ResetPasswordDto {
     example: 'student@example.com',
     description: 'Email address of the account resetting its password',
   })
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: '123456',
     description: 'Password reset verification code sent by email',
   })
-  code: string;
+  code!: string;
 
   @ApiProperty({
     example: 'NewSecurePassword123!',
     description: 'New password for the user account',
     format: 'password',
   })
-  newPassword: string;
+  newPassword!: string;
 }

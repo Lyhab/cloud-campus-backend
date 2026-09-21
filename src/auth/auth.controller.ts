@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,12 +16,14 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -89,7 +92,7 @@ export class AuthController {
   }
 
   @Get('me')
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Get current authenticated user',
     description:
@@ -103,7 +106,9 @@ export class AuthController {
     status: 401,
     description: 'Missing or invalid access token.',
   })
-  async getMe(@Headers('authorization') authorization?: string) {
+  async getMe(@Req() request: Request) {
+    const authorization = request.headers.authorization;
+
     const accessToken = authorization?.replace(/^Bearer\s+/i, '');
 
     if (!accessToken) {
@@ -115,7 +120,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Log out user',
     description:
@@ -129,7 +134,9 @@ export class AuthController {
     status: 401,
     description: 'Missing or invalid access token.',
   })
-  async logout(@Headers('authorization') authorization?: string) {
+  async logout(@Req() request: Request) {
+    const authorization = request.headers.authorization;
+
     const accessToken = authorization?.replace(/^Bearer\s+/i, '');
 
     if (!accessToken) {
@@ -174,5 +181,14 @@ export class AuthController {
   })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() refreshDto: RefreshTokenDto) {
+    return this.authService.refreshToken(
+      refreshDto.refreshToken,
+      refreshDto.email,
+    );
   }
 }

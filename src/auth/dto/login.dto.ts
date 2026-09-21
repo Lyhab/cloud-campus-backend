@@ -5,12 +5,12 @@ export class LoginDto {
     example: 'student@example.com',
     description: 'Email address of the user',
   })
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'SecurePassword123!',
     description: 'Password for the user account',
     format: 'password',
   })
-  password: string;
+  password!: string;
 }

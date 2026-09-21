@@ -5,11 +5,11 @@ export class ConfirmEmailDto {
     example: 'student@example.com',
     description: 'Email address of the account being confirmed',
   })
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: '123456',
     description: 'Verification code sent to the user by email',
   })
-  code: string;
+  code!: string;
 }

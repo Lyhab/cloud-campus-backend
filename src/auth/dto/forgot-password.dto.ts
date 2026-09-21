@@ -5,5 +5,5 @@ export class ForgotPasswordDto {
     example: 'student@example.com',
     description: 'Email address of the account requesting a password reset',
   })
-  email: string;
+  email!: string;
 }

@@ -5,7 +5,7 @@ export class RegisterDto {
     example: 'John',
     description: 'First name of the user',
   })
-  firstName: string;
+  firstName!: string;
 
   @ApiPropertyOptional({
     example: 'Michael',
@@ -17,18 +17,18 @@ export class RegisterDto {
     example: 'Smith',
     description: 'Last name of the user',
   })
-  lastName: string;
+  lastName!: string;
 
   @ApiProperty({
     example: 'john.smith@example.com',
     description: 'Email address used to sign in',
   })
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'SecurePassword123!',
     description: 'Password for the user account',
     format: 'password',
   })
-  password: string;
+  password!: string;
 }

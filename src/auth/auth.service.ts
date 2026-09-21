@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { eq } from 'drizzle-orm';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RegisterDto } from './dto/register.dto';
 
 import {
   CognitoIdentityProviderClient,
@@ -17,7 +19,9 @@ import {
 } from '@aws-sdk/client-cognito-identity-provider';
 
 import { createHmac } from 'crypto';
-import { RegisterDto } from './dto/register.dto';
+
+import { DbService } from '../db/db.service';
+import { users } from '../db/schema';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +30,10 @@ export class AuthService {
   private readonly clientId: string;
   private readonly clientSecret: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly dbService: DbService,
+  ) {
     const region = this.configService.getOrThrow<string>('AWS_REGION');
 
     this.userPoolId = this.configService.getOrThrow<string>(
@@ -62,6 +69,19 @@ export class AuthService {
 
     const result = await this.cognitoClient.send(command);
 
+    await this.dbService.db.insert(users).values({
+      id: result.UserSub!,
+      firstName: registerDto.firstName,
+      middleName: registerDto.middleName,
+      lastName: registerDto.lastName,
+      email: registerDto.email,
+      passwordHash: 'COGNITO',
+      role: 'student',
+      status: 'pending',
+      joinedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
     return {
       userSub: result.UserSub,
       userConfirmed: result.UserConfirmed,
@@ -80,12 +100,49 @@ export class AuthService {
       }),
     );
 
+    await this.dbService.db
+      .update(users)
+      .set({
+        status: 'active',
+        updatedAt: new Date(),
+      })
+      .where(eq(users.email, confirmEmailDto.email));
+
     return {
       message: 'Email confirmed successfully.',
     };
   }
 
   async login(loginDto: LoginDto) {
+    const user = await this.dbService.db
+      .select()
+      .from(users)
+      .where(eq(users.email, loginDto.email))
+      .limit(1);
+
+    if (!user[0]) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        message: 'No account found with this email.',
+      });
+    }
+
+    if (user[0].status === 'pending') {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        status: 'pending',
+        message: 'Please verify your email before logging in.',
+      });
+    }
+
+    if (user[0].status === 'inactive') {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        status: 'inactive',
+        message: 'Account is not active.',
+      });
+    }
+
     const secretHash = this.generateSecretHash(loginDto.email);
 
     const result = await this.cognitoClient.send(
@@ -120,19 +177,38 @@ export class AuthService {
       (attribute) => attribute.Name === 'sub',
     )?.Value;
 
-    const email = result.UserAttributes?.find(
-      (attribute) => attribute.Name === 'email',
-    )?.Value;
-
     const emailVerified =
       result.UserAttributes?.find(
         (attribute) => attribute.Name === 'email_verified',
       )?.Value === 'true';
 
+    if (!sub) {
+      throw new UnauthorizedException('Invalid user.');
+    }
+
+    const user = await this.dbService.db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        middleName: users.middleName,
+        lastName: users.lastName,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        profilePhotoUrl: users.profilePhotoUrl,
+        joinedAt: users.joinedAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, sub))
+      .limit(1);
+
+    if (!user[0]) {
+      throw new UnauthorizedException('User not found.');
+    }
+
     return {
-      username: result.Username,
-      sub,
-      email,
+      ...user[0],
       emailVerified,
     };
   }
@@ -180,6 +256,40 @@ export class AuthService {
 
     return {
       message: 'Password reset successfully.',
+    };
+  }
+
+  async refreshToken(refreshToken: string, email: string) {
+    const user = await this.dbService.db
+      .select({
+        id: users.id,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (!user[0]) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const secretHash = this.generateSecretHash(user[0].id);
+
+    const result = await this.cognitoClient.send(
+      new InitiateAuthCommand({
+        ClientId: this.clientId,
+        AuthFlow: 'REFRESH_TOKEN_AUTH',
+        AuthParameters: {
+          REFRESH_TOKEN: refreshToken,
+          SECRET_HASH: secretHash,
+        },
+      }),
+    );
+
+    return {
+      accessToken: result.AuthenticationResult?.AccessToken,
+      idToken: result.AuthenticationResult?.IdToken,
+      expiresIn: result.AuthenticationResult?.ExpiresIn,
+      tokenType: result.AuthenticationResult?.TokenType,
     };
   }
 
