@@ -8,6 +8,7 @@ import {
   HttpStatus,
   UnauthorizedException,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,6 +25,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AuthGuard } from './guards/auth.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -91,6 +93,7 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @UseGuards(AuthGuard)
   @Get('me')
   @ApiBearerAuth('access-token')
   @ApiOperation({
@@ -118,6 +121,7 @@ export class AuthController {
     return this.authService.getMe(accessToken);
   }
 
+  @UseGuards(AuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
