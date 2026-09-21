@@ -19,8 +19,10 @@ import {
 import { ChangeUserRoleDto } from './dto/change-user-role.dto';
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
-import { PaginatedUsersDto, UserDto } from './dto/paginated-users.dto';
+import { UserDto } from './dto/user.dto';
+import { PaginatedUsersDto } from './dto/paginated-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('Users')

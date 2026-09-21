@@ -1,47 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-
-export class UserDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  firstName: string;
-
-  @ApiProperty({ nullable: true })
-  middleName: string | null;
-
-  @ApiProperty()
-  lastName: string;
-
-  @ApiProperty()
-  email: string;
-
-  @ApiProperty()
-  role: string;
-
-  @ApiProperty()
-  status: string;
-
-  @ApiProperty({ nullable: true })
-  profilePhotoUrl: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  joinedAt: Date;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  updatedAt: Date;
-}
+import { UserDto } from './user.dto';
 
 export class PaginatedUsersDto {
   @ApiProperty({ type: [UserDto] })
-  data: UserDto[];
+  data!: UserDto[];
 
   @ApiProperty()
-  page: number;
+  page!: number;
 
   @ApiProperty()
-  limit: number;
+  limit!: number;
 
   @ApiProperty()
-  total: number;
+  total!: number;
 }

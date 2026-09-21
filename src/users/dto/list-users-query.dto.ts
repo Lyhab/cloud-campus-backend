@@ -1,30 +1,50 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListUsersQueryDto {
-  @ApiPropertyOptional({ description: 'Search user name or email' })
+  @ApiPropertyOptional({
+    description: 'Search by user name or email',
+    example: 'john',
+  })
   search?: string;
 
   @ApiPropertyOptional({
     description: 'Filter by role',
-    enum: ['ADMIN', 'STUDENT'],
+    enum: ['admin', 'student'],
+    example: 'student',
   })
-  role?: 'ADMIN' | 'STUDENT';
+  role?: 'admin' | 'student';
 
   @ApiPropertyOptional({
     description: 'Filter by status',
-    enum: ['ACTIVE', 'DISABLED'],
+    enum: ['pending', 'active', 'inactive'],
+    example: 'active',
   })
-  status?: 'ACTIVE' | 'DISABLED';
+  status?: 'pending' | 'active' | 'inactive';
 
   @ApiPropertyOptional({
+    description: 'Sort users',
     enum: ['alphabetical', 'newest', 'oldest'],
     default: 'newest',
+    example: 'newest',
   })
-  sort?: string;
+  sort?: 'alphabetical' | 'newest' | 'oldest';
 
-  @ApiPropertyOptional({ type: Number, default: 1, minimum: 1 })
+  @ApiPropertyOptional({
+    description: 'Page number',
+    type: Number,
+    default: 1,
+    minimum: 1,
+    example: 1,
+  })
   page?: string;
 
-  @ApiPropertyOptional({ type: Number, default: 20, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    description: 'Number of users per page',
+    type: Number,
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+    example: 20,
+  })
   limit?: string;
 }

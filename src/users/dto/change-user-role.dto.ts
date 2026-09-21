@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangeUserRoleDto {
-  @ApiProperty({ enum: ['ADMIN', 'STUDENT'], example: 'STUDENT' })
-  role: 'ADMIN' | 'STUDENT';
+  @ApiProperty({
+    enum: ['admin', 'student'],
+    example: 'student',
+  })
+  role!: 'admin' | 'student';
 }
