@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -7,7 +8,9 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Cloud Campus API')
-    .setDescription('Cloud Campus API')
+    .setDescription(
+      'Cloud Campus API documentation for users, courses, and enrollments',
+    )
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -21,9 +24,14 @@ async function bootstrap() {
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('api/docs', app, documentFactory);
+  SwaggerModule.setup('api/docs', app, documentFactory, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   await app.listen(3001);
 }
 
 void bootstrap();
+
