@@ -62,9 +62,15 @@ export class CoursesController {
   @UseGuards(AuthGuard)
   @Get(':courseId/students')
   @ApiOperation({ summary: 'List students enrolled in a course' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiOkResponse({ type: PaginatedCourseStudentsDto })
-  @ApiBadRequestResponse({ description: 'Invalid query parameter' })
+  @ApiBadRequestResponse({
+    description: 'Invalid course ID or query parameter',
+  })
   @ApiNotFoundResponse({ description: 'Course not found' })
   listCourseStudents(
     @Param('courseId') courseId: string,
@@ -76,8 +82,13 @@ export class CoursesController {
   @UseGuards(AuthGuard)
   @Get(':courseId')
   @ApiOperation({ summary: 'Get course details' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiOkResponse({ type: CourseDto })
+  @ApiBadRequestResponse({ description: 'Invalid course ID' })
   @ApiNotFoundResponse({ description: 'Course not found' })
   getCourse(@Param('courseId') courseId: string): Promise<CourseDto> {
     return this.coursesService.getCourse(courseId);
@@ -89,21 +100,33 @@ export class CoursesController {
   @ApiBody({ type: CreateCourseDto })
   @ApiCreatedResponse({ type: CourseDto })
   @ApiBadRequestResponse({ description: 'Invalid course payload' })
-  @ApiConflictResponse({ description: 'Course code already exists' })
+  @ApiConflictResponse({
+    description: 'Course code already exists',
+  })
   createCourse(@Body() body: CreateCourseDto): Promise<CourseDto> {
     return this.coursesService.createCourse(body);
   }
 
   @UseGuards(AuthGuard)
   @Post(':courseId/enrollment')
-  @ApiOperation({ summary: 'Enroll the authenticated user in a course' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiOperation({
+    summary: 'Enroll the authenticated user in a course',
+  })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiCreatedResponse({ type: EnrollmentDto })
   @ApiBadRequestResponse({
     description: 'User is not active or request is invalid',
   })
-  @ApiNotFoundResponse({ description: 'Course or user not found' })
-  @ApiConflictResponse({ description: 'Already enrolled in this course' })
+  @ApiNotFoundResponse({
+    description: 'Course or user not found',
+  })
+  @ApiConflictResponse({
+    description: 'Already enrolled in this course',
+  })
   enrollSelf(
     @Param('courseId') courseId: string,
     @Req() request: AuthenticatedRequest,
@@ -113,15 +136,29 @@ export class CoursesController {
 
   @UseGuards(AuthGuard, AdminGuard)
   @Post(':courseId/students/:userId')
-  @ApiOperation({ summary: 'Enroll a student in a course (admin only)' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
-  @ApiParam({ name: 'userId', type: String, format: 'uuid' })
+  @ApiOperation({
+    summary: 'Enroll a student in a course (admin only)',
+  })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiParam({
+    name: 'userId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiCreatedResponse({ type: EnrollmentDto })
   @ApiBadRequestResponse({
     description: 'User is not active or request is invalid',
   })
-  @ApiNotFoundResponse({ description: 'Course or user not found' })
-  @ApiConflictResponse({ description: 'Already enrolled in this course' })
+  @ApiNotFoundResponse({
+    description: 'Course or user not found',
+  })
+  @ApiConflictResponse({
+    description: 'Already enrolled in this course',
+  })
   enrollStudent(
     @Param('courseId') courseId: string,
     @Param('userId') userId: string,
@@ -131,13 +168,23 @@ export class CoursesController {
 
   @UseGuards(AuthGuard, AdminGuard)
   @Patch(':courseId')
-  @ApiOperation({ summary: 'Update a course (admin only)' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiOperation({
+    summary: 'Update a course (admin only)',
+  })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiBody({ type: UpdateCourseDto })
   @ApiOkResponse({ type: CourseDto })
-  @ApiBadRequestResponse({ description: 'Invalid course payload' })
+  @ApiBadRequestResponse({
+    description: 'Invalid course payload',
+  })
   @ApiNotFoundResponse({ description: 'Course not found' })
-  @ApiConflictResponse({ description: 'Course code already exists' })
+  @ApiConflictResponse({
+    description: 'Course code already exists',
+  })
   updateCourse(
     @Param('courseId') courseId: string,
     @Body() body: UpdateCourseDto,
@@ -148,13 +195,23 @@ export class CoursesController {
   @UseGuards(AuthGuard, AdminGuard)
   @Delete(':courseId')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Delete a course (admin only)' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
-  @ApiOkResponse({ type: EnrollmentMessageDto })
+  @ApiOperation({
+    summary: 'Delete a course (admin only)',
+  })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Course deleted successfully',
+  })
   @ApiBadRequestResponse({
     description: 'Course still has resources and cannot be deleted',
   })
-  @ApiNotFoundResponse({ description: 'Course not found' })
+  @ApiNotFoundResponse({
+    description: 'Course not found',
+  })
   deleteCourse(
     @Param('courseId') courseId: string,
   ): Promise<{ message: string }> {
@@ -164,8 +221,14 @@ export class CoursesController {
   @UseGuards(AuthGuard)
   @Delete(':courseId/enrollment')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Leave / unenroll from a course' })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiOperation({
+    summary: 'Leave / unenroll from a course',
+  })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiOkResponse({ type: EnrollmentMessageDto })
   @ApiNotFoundResponse({
     description: 'Course not found or user is not enrolled',
@@ -183,8 +246,16 @@ export class CoursesController {
   @ApiOperation({
     summary: 'Unenroll a specific student from a course (admin only)',
   })
-  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
-  @ApiParam({ name: 'userId', type: String, format: 'uuid' })
+  @ApiParam({
+    name: 'courseId',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiParam({
+    name: 'userId',
+    type: String,
+    format: 'uuid',
+  })
   @ApiOkResponse({ type: EnrollmentMessageDto })
   @ApiNotFoundResponse({
     description: 'Course not found or student is not enrolled',

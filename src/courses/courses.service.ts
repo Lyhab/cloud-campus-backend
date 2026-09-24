@@ -35,7 +35,7 @@ export class CoursesService {
       throw new BadRequestException('page is too large');
     }
 
-    const sort = this.parseString(query.sort, 'sort') ?? 'newest';
+    const sort = this.parseString(query.sort, 'sort') ?? 'alphabetical';
     if (!['alphabetical', 'newest', 'oldest'].includes(sort)) {
       throw new BadRequestException(
         'sort must be alphabetical, newest, or oldest',
@@ -63,7 +63,7 @@ export class CoursesService {
             ilike(courses.description, `%${search}%`),
           )
         : undefined,
-      code ? ilike(courses.code, `%${code}%`) : undefined,
+      code ? ilike(courses.code, `${code}%`) : undefined,
       filter === 'my-courses'
         ? sql`exists (
             select 1
@@ -80,6 +80,20 @@ export class CoursesService {
         : sort === 'oldest'
           ? [asc(courses.createdAt), asc(courses.id)]
           : [desc(courses.createdAt), asc(courses.id)];
+
+    const courseCodes = await this.dbService.db
+      .selectDistinct({
+        code: courses.code,
+      })
+      .from(courses);
+
+    const codes = [
+      ...new Set(
+        courseCodes
+          .map(({ code }) => code.match(/^[^0-9]+/)?.[0]?.trim())
+          .filter((code): code is string => Boolean(code)),
+      ),
+    ].sort();
 
     const [data, totalRows] = await Promise.all([
       this.dbService.db
@@ -100,7 +114,7 @@ export class CoursesService {
       this.dbService.db.select({ total: count() }).from(courses).where(filters),
     ]);
 
-    return { data, page, limit, total: totalRows[0].total };
+    return { data, codes, page, limit, total: totalRows[0].total };
   }
 
   async getCourse(courseId: string): Promise<CourseDto> {
@@ -178,8 +192,6 @@ export class CoursesService {
           middleName: users.middleName,
           lastName: users.lastName,
           email: users.email,
-          role: users.role,
-          status: users.status,
           profilePhotoUrl: users.profilePhotoUrl,
           enrolledAt: enrollments.joinedAt,
         })
@@ -342,14 +354,22 @@ export class CoursesService {
     courseId: string,
     authenticatedUserId: string,
   ): Promise<{ message: string }> {
-    return this.unenrollUser(courseId, authenticatedUserId, 'You are not enrolled in this course');
+    return this.unenrollUser(
+      courseId,
+      authenticatedUserId,
+      'You are not enrolled in this course',
+    );
   }
 
   async unenrollStudent(
     courseId: string,
     userId: string,
   ): Promise<{ message: string }> {
-    return this.unenrollUser(courseId, userId, 'Student is not enrolled in this course');
+    return this.unenrollUser(
+      courseId,
+      userId,
+      'Student is not enrolled in this course',
+    );
   }
 
   private async enrollUser(
@@ -372,8 +392,12 @@ export class CoursesService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role !== 'student') {
+      throw new BadRequestException('Only students can be enrolled');
+    }
+
     if (user.status !== 'active') {
-      throw new BadRequestException('Only active users can be enrolled');
+      throw new BadRequestException('Only active students can be enrolled');
     }
 
     const [existing] = await this.dbService.db

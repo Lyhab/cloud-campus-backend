@@ -1,14 +1,11 @@
+import { seedCourses } from './courses.seed';
 import { seedUsers } from './users.seed';
 
-async function seed() {
+export async function seed() {
   console.log('🌱 Starting database seeding...');
 
   await seedUsers();
+  await seedCourses();
 
   console.log('✅ Database seeding completed.');
 }
-
-seed().catch((error) => {
-  console.error('❌ Database seeding failed:', error);
-  process.exit(1);
-});

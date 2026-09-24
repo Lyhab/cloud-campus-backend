@@ -1,8 +1,9 @@
 import 'dotenv/config';
+
 import { readFileSync } from 'fs';
 import { Client } from 'pg';
 
-import { seedUsers } from '../src/seeds/users.seed';
+import { seed } from '../src/seeds/seed';
 
 async function resetDatabase() {
   const client = new Client({
@@ -14,7 +15,7 @@ async function resetDatabase() {
   try {
     console.log('🗑️ Dropping public schema...');
 
-    await client.query('DROP SCHEMA public CASCADE;');
+    await client.query('DROP SCHEMA IF EXISTS public CASCADE;');
     await client.query('CREATE SCHEMA public;');
 
     console.log('📦 Running migration...');
@@ -30,9 +31,7 @@ async function resetDatabase() {
       await client.query(statement);
     }
 
-    console.log('🌱 Seeding users...');
-
-    await seedUsers();
+    await seed();
 
     console.log('✅ Database reset, migrated, and seeded successfully!');
   } finally {

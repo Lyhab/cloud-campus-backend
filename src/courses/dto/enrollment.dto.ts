@@ -2,16 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class EnrollmentDto {
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  userId!: string;
 
   @ApiProperty({ format: 'uuid' })
-  courseId: string;
+  courseId!: string;
 
-  @ApiProperty()
-  joinedAt: Date;
+  @ApiProperty({ type: String, format: 'date-time' })
+  joinedAt!: Date;
 }
 
 export class EnrollmentMessageDto {
   @ApiProperty({ example: 'Successfully left the course' })
-  message: string;
+  message!: string;
 }

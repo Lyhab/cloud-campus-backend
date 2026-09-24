@@ -1,11 +1,15 @@
 import 'dotenv/config';
+
 import { randomUUID } from 'crypto';
+
 import { Client } from 'pg';
+
 import { drizzle } from 'drizzle-orm/node-postgres';
 
 import { users } from '../db/schema';
 
 type SeedUser = {
+  id: string;
   firstName: string;
   middleName: string | null;
   lastName: string;
@@ -18,6 +22,7 @@ type SeedUser = {
 const seedUsersData: SeedUser[] = [
   // Admins
   {
+    id: randomUUID(),
     firstName: 'James',
     middleName: 'Robert',
     lastName: 'Anderson',
@@ -26,7 +31,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-01T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Sarah',
     middleName: 'Jane',
     lastName: 'Mitchell',
@@ -35,7 +42,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-05T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Daniel',
     middleName: null,
     lastName: 'Wilson',
@@ -47,6 +56,7 @@ const seedUsersData: SeedUser[] = [
 
   // Students
   {
+    id: randomUUID(),
     firstName: 'Emily',
     middleName: 'Rose',
     lastName: 'Taylor',
@@ -55,7 +65,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-12T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Michael',
     middleName: 'James',
     lastName: 'Brown',
@@ -64,7 +76,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-14T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Olivia',
     middleName: null,
     lastName: 'Davis',
@@ -73,7 +87,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-16T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'William',
     middleName: 'Henry',
     lastName: 'Miller',
@@ -82,7 +98,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-18T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Sophia',
     middleName: 'Grace',
     lastName: 'Moore',
@@ -91,7 +109,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-20T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Benjamin',
     middleName: null,
     lastName: 'Jackson',
@@ -100,7 +120,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-22T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Isabella',
     middleName: 'Marie',
     lastName: 'White',
@@ -109,7 +131,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-24T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Lucas',
     middleName: 'Alexander',
     lastName: 'Harris',
@@ -118,7 +142,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-26T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Mia',
     middleName: null,
     lastName: 'Martin',
@@ -127,7 +153,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-28T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Ethan',
     middleName: 'David',
     lastName: 'Thompson',
@@ -136,7 +164,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-08-30T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Charlotte',
     middleName: 'Anne',
     lastName: 'Garcia',
@@ -145,7 +175,9 @@ const seedUsersData: SeedUser[] = [
     status: 'active',
     joinedAt: new Date('2026-09-01T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Alexander',
     middleName: null,
     lastName: 'Martinez',
@@ -154,7 +186,9 @@ const seedUsersData: SeedUser[] = [
     status: 'inactive',
     joinedAt: new Date('2026-09-03T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Amelia',
     middleName: 'Louise',
     lastName: 'Robinson',
@@ -163,7 +197,9 @@ const seedUsersData: SeedUser[] = [
     status: 'inactive',
     joinedAt: new Date('2026-09-05T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Henry',
     middleName: 'Thomas',
     lastName: 'Clark',
@@ -172,7 +208,9 @@ const seedUsersData: SeedUser[] = [
     status: 'pending',
     joinedAt: new Date('2026-09-07T09:00:00Z'),
   },
+
   {
+    id: randomUUID(),
     firstName: 'Jack',
     middleName: 'Edward',
     lastName: 'Lewis',
@@ -180,6 +218,29 @@ const seedUsersData: SeedUser[] = [
     role: 'student',
     status: 'active',
     joinedAt: new Date('2026-09-09T09:00:00Z'),
+  },
+
+  // Personal Cognito accounts
+  {
+    id: '99be6468-e071-7070-6895-c7f07bf2aa65',
+    firstName: 'Lyhab',
+    middleName: null,
+    lastName: 'Student',
+    email: 'lyhabrithyny@gmail.com',
+    role: 'student',
+    status: 'active',
+    joinedAt: new Date('2026-09-09T10:00:00Z'),
+  },
+
+  {
+    id: '096ec4f8-9061-70c2-e3f3-72a7142483dc',
+    firstName: 'Lyhab',
+    middleName: null,
+    lastName: 'Admin',
+    email: 'lyhabrithyny.work@gmail.com',
+    role: 'admin',
+    status: 'active',
+    joinedAt: new Date('2026-09-09T08:00:00Z'),
   },
 ];
 
@@ -196,16 +257,12 @@ export async function seedUsers() {
     const db = drizzle(client);
 
     const values = seedUsersData.map((user) => ({
-      id: randomUUID(),
       ...user,
-      passwordHash: 'SEEDED',
       profilePhotoUrl: null,
       updatedAt: user.joinedAt,
     }));
 
     await db.insert(users).values(values);
-
-    console.log(`✅ Seeded ${values.length} users.`);
   } finally {
     await client.end();
   }

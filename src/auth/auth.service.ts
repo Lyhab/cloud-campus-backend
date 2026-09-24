@@ -76,7 +76,6 @@ export class AuthService {
       middleName: registerDto.middleName,
       lastName: registerDto.lastName,
       email: registerDto.email,
-      passwordHash: 'COGNITO',
       role: 'student',
       status: 'pending',
       joinedAt: new Date(),

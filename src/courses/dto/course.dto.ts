@@ -2,26 +2,26 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CourseDto {
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  id!: string;
 
   @ApiProperty({ example: 'COMP101' })
-  code: string;
+  code!: string;
 
   @ApiProperty({ example: 'Introduction to Computer Science' })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({
     nullable: true,
     example: 'Foundational programming and computing concepts.',
   })
-  description: string | null;
+  description!: string | null;
 
   @ApiProperty({ example: 24 })
-  studentCount: number;
+  studentCount!: number;
 
-  @ApiProperty()
-  createdAt: Date;
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
 
-  @ApiProperty()
-  updatedAt: Date;
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: Date;
 }

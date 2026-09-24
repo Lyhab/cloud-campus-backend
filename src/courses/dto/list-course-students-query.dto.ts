@@ -1,7 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListCourseStudentsQueryDto {
-  @ApiPropertyOptional({ example: 1, description: 'Page number (default 1)' })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Page number (default 1)',
+  })
   page?: string;
 
   @ApiPropertyOptional({
@@ -13,9 +16,10 @@ export class ListCourseStudentsQueryDto {
   @ApiPropertyOptional({
     enum: ['alphabetical', 'newest', 'oldest'],
     example: 'alphabetical',
-    description: 'Sort by student name or enrollment date (default alphabetical)',
+    description:
+      'Sort by student name or enrollment date (default alphabetical)',
   })
-  sort?: string;
+  sort?: 'alphabetical' | 'newest' | 'oldest';
 
   @ApiPropertyOptional({
     example: 'smith',

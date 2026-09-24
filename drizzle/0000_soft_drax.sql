@@ -65,7 +65,6 @@ CREATE TABLE "users" (
 	"middle_name" varchar(100),
 	"last_name" varchar(100) NOT NULL,
 	"email" varchar(255) NOT NULL,
-	"password_hash" varchar(255) NOT NULL,
 	"role" varchar(20) NOT NULL,
 	"status" varchar(20) NOT NULL,
 	"profile_photo_url" varchar(500),

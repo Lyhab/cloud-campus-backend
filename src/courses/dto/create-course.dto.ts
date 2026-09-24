@@ -2,13 +2,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCourseDto {
   @ApiProperty({ example: 'COMP101', maxLength: 50 })
-  code: string;
+  code!: string;
 
   @ApiProperty({
     example: 'Introduction to Computer Science',
     maxLength: 255,
   })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({
     nullable: true,

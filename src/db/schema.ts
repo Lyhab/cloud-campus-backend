@@ -22,8 +22,6 @@ export const users = pgTable('users', {
 
   email: varchar('email', { length: 255 }).notNull().unique(),
 
-  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-
   role: varchar('role', {
     length: 20,
     enum: ['admin', 'student'],
