@@ -1,98 +1,187 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Cloud Campus Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The backend API for **Cloud Campus**, a cloud-based learning management system built with NestJS, TypeScript, Drizzle ORM and PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech Stack
 
-## Description
+- **Framework:** NestJS
+- **Language:** TypeScript
+- **ORM:** Drizzle ORM
+- **Database:** PostgreSQL
+- **API Documentation:** Swagger
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## AWS Architecture
 
-## Project setup
+Cloud Campus uses a serverless, three-tier architecture designed to run on AWS.
 
-```bash
-$ npm install
-```
+| Layer          | AWS Service        | Purpose                                                |
+| -------------- | ------------------ | ------------------------------------------------------ |
+| Frontend       | AWS Amplify        | Hosts and deploys the Next.js application              |
+| API            | Amazon API Gateway | Exposes and manages REST APIs                          |
+| Backend        | AWS Lambda         | Runs the NestJS backend                                |
+| Database       | Amazon RDS         | Hosts the PostgreSQL database                          |
+| Authentication | Amazon Cognito     | Handles user authentication                            |
+| File Storage   | Amazon S3          | Stores uploaded files                                  |
+| Monitoring     | Amazon CloudWatch  | Collects logs, metrics and application monitoring data |
 
-## Compile and run the project
+_AWS deployment services are subject to implementation and deployment status._
 
-```bash
-# development
-$ npm run start
+## Prerequisites
 
-# watch mode
-$ npm run start:dev
+- Node.js
+- npm
 
-# production mode
-$ npm run start:prod
-```
+## Installation
 
-## Run tests
+Clone the repository and install dependencies.
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+git clone https://github.com/Lyhab/cloud-campus-backend.git
+cd cloud-campus-backend
+npm install
 ```
+
+## Environment Variables
+
+Create a `.env` file in the project root.
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:port/db_name
+
+#Cloud Services
+AWS_REGION=your_aws_region
+
+# AWS Cognito
+COGNITO_USER_POOL_ID=your_user_pool_id
+COGNITO_CLIENT_ID=your_client_id
+COGNITO_CLIENT_SECRET=your_client_secret
+
+# Amazon S3
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_S3_BUCKET_NAME=your_bucket_name
+```
+
+Replace the placeholders with your actual configuration.
+
+## Database Setup
+
+Cloud Campus uses PostgreSQL with Drizzle ORM for database management.
+
+### Database Scripts
+
+| Command               | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `npm run db:generate` | Generate migration files from schema changes         |
+| `npm run db:migrate`  | Apply pending migrations                             |
+| `npm run db:seed`     | Populate the database with initial data              |
+| `npm run db:reset`    | Drop and recreate the public schema                  |
+| `npm run db:rebuild`  | Reset the database, run all migrations and seed data |
+
+### Initial Setup
+
+To initialize the database, run:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+Alternatively, use:
+
+```bash
+npm run db:rebuild
+```
+
+**Warning:** `db:reset` and `db:rebuild` permanently delete existing data in the public schema. Use them with caution.
+
+### Updating the Database
+
+After modifying the Drizzle schema, generate and apply a migration.
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+## Running the Application
+
+```bash
+# Development
+npm run start
+
+# Watch mode
+npm run dev
+
+# Production
+npm run start:prod
+```
+
+The application runs on `http://localhost:3001` by default.
+
+## API Documentation
+
+Cloud Campus uses Swagger for interactive API documentation.
+
+Once the application is running, access:
+
+**http://localhost:3001/api/docs**
+
+Swagger allows developers to explore API endpoints, inspect request and response schemas and test API operations.
+
+## Testing
+
+Run the following commands to execute tests.
+
+```bash
+# Unit tests
+npm run test
+
+# End-to-end tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+```
+
+## Project Structure
+
+```text
+src/
+├── auth/           # Authentication and authorization
+├── courses/        # Course management
+├── dashboard/      # Dashboard APIs
+├── db/             # Database configuration and schema
+├── homepage/       # Homepage APIs
+├── reports/        # Reports management
+├── resources/      # Resources management
+├── s3/             # S3 cloud service
+├── search/         # Global search
+├── seeds/          # Database seed data
+├── users/          # User management
+└── main.ts         # Application entry point
+
+drizzle/            # Database migration files
+scripts/            # Database reset and rebuild scripts
+```
+
+## Development Workflow
+
+1. Pull the latest changes from the development branch.
+2. Install dependencies using `npm install`.
+3. Configure the `.env` file.
+4. Run database migrations if necessary.
+5. Start the development server using `npm run dev`.
+6. Test API endpoints using Swagger.
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+The application is designed for deployment on AWS.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **AWS Amplify:** Frontend hosting and deployment.
+- **Amazon API Gateway:** REST API management.
+- **AWS Lambda:** Serverless backend execution.
+- **Amazon RDS:** Managed PostgreSQL database.
+- **Amazon Cognito:** Authentication.
+- **Amazon S3:** File storage.
+- **Amazon CloudWatch:** Logging, metrics and monitoring.

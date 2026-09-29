@@ -1,9 +1,6 @@
 import 'dotenv/config';
 
-import { readFileSync } from 'fs';
 import { Client } from 'pg';
-
-import { seed } from '../src/seeds/seed';
 
 async function resetDatabase() {
   const client = new Client({
@@ -14,26 +11,12 @@ async function resetDatabase() {
 
   try {
     console.log('🗑️ Dropping public schema...');
-
     await client.query('DROP SCHEMA IF EXISTS public CASCADE;');
+
+    console.log('📦 Recreating public schema...');
     await client.query('CREATE SCHEMA public;');
 
-    console.log('📦 Running migration...');
-
-    const migration = readFileSync('./drizzle/0000_soft_drax.sql', 'utf8');
-
-    const statements = migration
-      .split('--> statement-breakpoint')
-      .map((statement) => statement.trim())
-      .filter(Boolean);
-
-    for (const statement of statements) {
-      await client.query(statement);
-    }
-
-    await seed();
-
-    console.log('✅ Database reset, migrated, and seeded successfully!');
+    console.log('✅ Database reset successfully!');
   } finally {
     await client.end();
   }
