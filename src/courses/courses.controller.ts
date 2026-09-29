@@ -26,6 +26,10 @@ import {
 
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AuthGuard, AuthenticatedRequest } from '../auth/guards/auth.guard';
+import {
+  OptionalAuthGuard,
+  OptionalAuthenticatedRequest,
+} from '../auth/guards/optional-auth.guard';
 
 import { CoursesService } from './courses.service';
 import { CourseDto } from './dto/course.dto';
@@ -38,12 +42,11 @@ import { PaginatedCoursesDto } from './dto/paginated-courses.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 
 @ApiTags('Courses')
-@ApiBearerAuth('access-token')
 @Controller('courses')
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
-  @UseGuards(AuthGuard)
+  @UseGuards(OptionalAuthGuard)
   @Get()
   @ApiOperation({
     summary: 'List courses',
@@ -54,12 +57,13 @@ export class CoursesController {
   @ApiBadRequestResponse({ description: 'Invalid query parameter' })
   listCourses(
     @Query() query: ListCoursesQueryDto,
-    @Req() request: AuthenticatedRequest,
+    @Req() request: OptionalAuthenticatedRequest,
   ): Promise<PaginatedCoursesDto> {
-    return this.coursesService.listCourses(query, request.user.sub);
+    return this.coursesService.listCourses(query, request.user?.sub);
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Get(':courseId/students')
   @ApiOperation({ summary: 'List students enrolled in a course' })
   @ApiParam({
@@ -79,7 +83,6 @@ export class CoursesController {
     return this.coursesService.listCourseStudents(courseId, query);
   }
 
-  @UseGuards(AuthGuard)
   @Get(':courseId')
   @ApiOperation({ summary: 'Get course details' })
   @ApiParam({
@@ -95,6 +98,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
   @Post()
   @ApiOperation({ summary: 'Create a course (admin only)' })
   @ApiBody({ type: CreateCourseDto })
@@ -108,6 +112,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Post(':courseId/enrollment')
   @ApiOperation({
     summary: 'Enroll the authenticated user in a course',
@@ -135,6 +140,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
   @Post(':courseId/students/:userId')
   @ApiOperation({
     summary: 'Enroll a student in a course (admin only)',
@@ -167,6 +173,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
   @Patch(':courseId')
   @ApiOperation({
     summary: 'Update a course (admin only)',
@@ -193,6 +200,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':courseId')
   @HttpCode(200)
   @ApiOperation({
@@ -219,6 +227,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':courseId/enrollment')
   @HttpCode(200)
   @ApiOperation({
@@ -241,6 +250,7 @@ export class CoursesController {
   }
 
   @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':courseId/students/:userId')
   @HttpCode(200)
   @ApiOperation({

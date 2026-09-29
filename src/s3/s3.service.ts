@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
 export class S3Service {
@@ -43,12 +45,41 @@ export class S3Service {
     return key;
   }
 
+  async download(key: string): Promise<Buffer> {
+    const response = await this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error(`File not found in S3: ${key}`);
+    }
+
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(Buffer.from(chunk));
+    }
+
+    return Buffer.concat(chunks);
+  }
+
   async delete(key: string): Promise<void> {
     await this.s3Client.send(
       new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: key,
       }),
+    );
+  }
+
+  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+    return getSignedUrl(
+      this.s3Client,
+      new GetObjectCommand({ Bucket: this.bucketName, Key: key }),
+      { expiresIn },
     );
   }
 }

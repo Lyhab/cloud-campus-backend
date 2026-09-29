@@ -3,10 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 
 import { DbService } from '../db/db.service';
+import { S3Service } from '../s3/s3.service';
 import { courses, enrollments, resources, users } from '../db/schema';
 
 import { CourseDto } from './dto/course.dto';
@@ -20,22 +22,28 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly dbService: DbService) {}
+  constructor(
+    private readonly dbService: DbService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   async listCourses(
     query: ListCoursesQueryDto,
-    authenticatedUserId: string,
+    authenticatedUserId?: string,
   ): Promise<PaginatedCoursesDto> {
     const page = this.parsePositiveInteger(query.page, 1, 'page');
     const limit = this.parsePositiveInteger(query.limit, 20, 'limit');
+
     if (limit > 100) {
       throw new BadRequestException('limit must be at most 100');
     }
+
     if (!Number.isSafeInteger((page - 1) * limit)) {
       throw new BadRequestException('page is too large');
     }
 
     const sort = this.parseString(query.sort, 'sort') ?? 'alphabetical';
+
     if (!['alphabetical', 'newest', 'oldest'].includes(sort)) {
       throw new BadRequestException(
         'sort must be alphabetical, newest, or oldest',
@@ -45,15 +53,22 @@ export class CoursesService {
     const search = this.parseString(query.search, 'search')?.trim();
     const code = this.parseString(query.code, 'code')?.trim();
     const filter = this.parseString(query.filter, 'filter');
+
     if (filter !== undefined && filter !== 'my-courses') {
       throw new BadRequestException('filter must be my-courses');
     }
 
-    const studentCount = sql<number>`(
-      select count(*)::int
-      from ${enrollments}
-      where ${enrollments.courseId} = ${courses.id}
-    )`;
+    if (filter === 'my-courses' && !authenticatedUserId) {
+      throw new UnauthorizedException(
+        'Authentication is required to view your courses.',
+      );
+    }
+
+    const studentCount = sql<number>`
+    select count(*)::int
+    from ${enrollments}
+    where ${enrollments.courseId} = ${courses.id}
+  `;
 
     const filters = and(
       search
@@ -66,11 +81,11 @@ export class CoursesService {
       code ? ilike(courses.code, `${code}%`) : undefined,
       filter === 'my-courses'
         ? sql`exists (
-            select 1
-            from ${enrollments}
-            where ${enrollments.courseId} = ${courses.id}
-              and ${enrollments.userId} = ${authenticatedUserId}
-          )`
+          select 1
+          from ${enrollments}
+          where ${enrollments.courseId} = ${courses.id}
+            and ${enrollments.userId} = ${authenticatedUserId}
+        )`
         : undefined,
     );
 
@@ -111,6 +126,7 @@ export class CoursesService {
         .orderBy(...orderBy)
         .limit(limit)
         .offset((page - 1) * limit),
+
       this.dbService.db.select({ total: count() }).from(courses).where(filters),
     ]);
 
@@ -184,7 +200,7 @@ export class CoursesService {
           ? [asc(enrollments.joinedAt), asc(users.id)]
           : [asc(users.firstName), asc(users.lastName), asc(users.id)];
 
-    const [data, totalRows] = await Promise.all([
+    const [rows, totalRows] = await Promise.all([
       this.dbService.db
         .select({
           id: users.id,
@@ -207,6 +223,15 @@ export class CoursesService {
         .innerJoin(users, eq(users.id, enrollments.userId))
         .where(filters),
     ]);
+
+    const data = await Promise.all(
+      rows.map(async (student) => ({
+        ...student,
+        profilePhotoUrl: student.profilePhotoUrl
+          ? await this.s3Service.getPresignedUrl(student.profilePhotoUrl)
+          : null,
+      })),
+    );
 
     return { data, page, limit, total: totalRows[0].total };
   }

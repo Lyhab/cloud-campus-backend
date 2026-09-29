@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { S3Service } from '../s3/s3.service';
 
 import {
   CognitoIdentityProviderClient,
@@ -33,6 +34,7 @@ export class AuthService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly s3Service: S3Service,
     private readonly dbService: DbService,
   ) {
     const region = this.configService.getOrThrow<string>('AWS_REGION');
@@ -209,6 +211,9 @@ export class AuthService {
 
     return {
       ...user[0],
+      profilePhotoUrl: user[0].profilePhotoUrl
+        ? await this.s3Service.getPresignedUrl(user[0].profilePhotoUrl)
+        : null,
       emailVerified,
     };
   }

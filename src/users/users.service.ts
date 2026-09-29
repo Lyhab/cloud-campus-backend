@@ -76,7 +76,7 @@ export class UsersService {
           ? [asc(users.joinedAt), asc(users.id)]
           : [desc(users.joinedAt), asc(users.id)];
 
-    const [data, totalRows] = await Promise.all([
+    const [rows, totalRows] = await Promise.all([
       this.dbService.db
         .select({
           id: users.id,
@@ -97,6 +97,8 @@ export class UsersService {
         .offset((page - 1) * limit),
       this.dbService.db.select({ total: count() }).from(users).where(filters),
     ]);
+
+    const data = await Promise.all(rows.map((u) => this.withSignedPhoto(u)));
 
     return { data, page, limit, total: totalRows[0].total };
   }
@@ -123,7 +125,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.withSignedPhoto(user);
   }
 
   async updateUser(
@@ -252,7 +254,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.withSignedPhoto(user);
   }
 
   async changeUserRole(
@@ -292,7 +294,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.withSignedPhoto(user);
   }
 
   async changeUserStatus(
@@ -332,7 +334,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.withSignedPhoto(user);
   }
 
   async changePassword(
@@ -390,7 +392,9 @@ export class UsersService {
     maxLength: number,
     nullable: true,
   ): string | null;
+
   private validateText(value: unknown, name: string, maxLength: number): string;
+
   private validateText(
     value: unknown,
     name: string,
@@ -408,5 +412,16 @@ export class UsersService {
       );
     }
     return value;
+  }
+
+  private async withSignedPhoto<T extends { profilePhotoUrl: string | null }>(
+    user: T,
+  ): Promise<T> {
+    return {
+      ...user,
+      profilePhotoUrl: user.profilePhotoUrl
+        ? await this.s3Service.getPresignedUrl(user.profilePhotoUrl)
+        : null,
+    };
   }
 }
