@@ -10,6 +10,7 @@ import { CoursesModule } from './courses/courses.module';
 import { ResourcesModule } from './resources/resources.module';
 import { ReportsModule } from './reports/reports.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { HomepageModule } from './homepage/homepage.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ResourcesModule,
     ReportsModule,
     DashboardModule,
+    HomepageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
