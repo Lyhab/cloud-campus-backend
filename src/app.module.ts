@@ -11,6 +11,7 @@ import { ResourcesModule } from './resources/resources.module';
 import { ReportsModule } from './reports/reports.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HomepageModule } from './homepage/homepage.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { HomepageModule } from './homepage/homepage.module';
     ReportsModule,
     DashboardModule,
     HomepageModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
