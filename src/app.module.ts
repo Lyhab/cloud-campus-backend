@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { S3Module } from './s3/s3.module';
 import { CoursesModule } from './courses/courses.module';
 import { ResourcesModule } from './resources/resources.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ResourcesModule } from './resources/resources.module';
     S3Module,
     CoursesModule,
     ResourcesModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
