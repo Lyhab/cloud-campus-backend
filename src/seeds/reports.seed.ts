@@ -136,8 +136,6 @@ export async function seedReports() {
     );
 
     await db.insert(reports).values(reportRows);
-
-    console.log(`✅ Seeded ${reportRows.length} reports.`);
   } finally {
     await client.end();
   }

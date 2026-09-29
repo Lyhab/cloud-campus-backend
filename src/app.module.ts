@@ -9,6 +9,7 @@ import { S3Module } from './s3/s3.module';
 import { CoursesModule } from './courses/courses.module';
 import { ResourcesModule } from './resources/resources.module';
 import { ReportsModule } from './reports/reports.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ReportsModule } from './reports/reports.module';
     CoursesModule,
     ResourcesModule,
     ReportsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
