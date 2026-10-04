@@ -1,4 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class PendingReportsQueryDto {
   @ApiPropertyOptional({
@@ -7,6 +9,8 @@ export class PendingReportsQueryDto {
     default: 'oldest',
     description: 'Sort order (default oldest)',
   })
+  @IsOptional()
+  @IsIn(['newest', 'oldest'])
   sort?: 'newest' | 'oldest';
 
   @ApiPropertyOptional({
@@ -15,6 +19,8 @@ export class PendingReportsQueryDto {
     default: 'pending',
     description: 'Filter reports by status',
   })
+  @IsOptional()
+  @IsIn(['pending', 'dismissed', 'resolved'])
   status?: 'pending' | 'dismissed' | 'resolved';
 
   @ApiPropertyOptional({
@@ -22,5 +28,10 @@ export class PendingReportsQueryDto {
     default: 5,
     description: 'Number of reports to return (default 5)',
   })
-  limit?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

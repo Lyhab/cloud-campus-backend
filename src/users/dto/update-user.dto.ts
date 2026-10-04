@@ -1,4 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateUserDto {
   @ApiPropertyOptional({
@@ -6,6 +13,10 @@ export class UpdateUserDto {
     maxLength: 100,
     example: 'John',
   })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   firstName?: string;
 
   @ApiPropertyOptional({
@@ -14,6 +25,9 @@ export class UpdateUserDto {
     nullable: true,
     example: 'Michael',
   })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
   middleName?: string | null;
 
   @ApiPropertyOptional({
@@ -21,6 +35,10 @@ export class UpdateUserDto {
     maxLength: 100,
     example: 'Smith',
   })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   lastName?: string;
 
   @ApiPropertyOptional({
@@ -29,5 +47,9 @@ export class UpdateUserDto {
     nullable: true,
     example: 'https://example.com/profile.jpg',
   })
+  @IsOptional()
+  @IsString()
+  @IsUrl()
+  @MaxLength(500)
   profilePhotoUrl?: string | null;
 }
