@@ -84,4 +84,15 @@ export class ListResourcesQueryDto {
   @IsOptional()
   @IsIn(['all', 'pending', 'approved', 'rejected'])
   status?: 'all' | 'pending' | 'approved' | 'rejected';
+
+  @ApiPropertyOptional({
+    enum: ['admin', 'student'],
+    example: 'student',
+    default: 'student',
+    description:
+      'Resource visibility view. Admin view shows all statuses; student view shows approved resources only.',
+  })
+  @IsOptional()
+  @IsIn(['admin', 'student'])
+  view?: 'admin' | 'student';
 }

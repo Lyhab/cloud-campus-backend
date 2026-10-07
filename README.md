@@ -24,8 +24,6 @@ Cloud Campus uses a serverless, three-tier architecture designed to run on AWS.
 | File Storage   | Amazon S3          | Stores uploaded files                                  |
 | Monitoring     | Amazon CloudWatch  | Collects logs, metrics and application monitoring data |
 
-_AWS deployment services are subject to implementation and deployment status._
-
 ## Prerequisites
 
 - Node.js

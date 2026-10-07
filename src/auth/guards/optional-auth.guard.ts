@@ -8,11 +8,18 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
+interface AuthenticatedUser {
+  sub: string;
+  [key: string]: unknown;
+}
+
+interface AuthCookies {
+  cc_access_token?: string;
+}
+
 export interface OptionalAuthenticatedRequest extends Request {
-  user?: {
-    sub: string;
-    [key: string]: unknown;
-  };
+  user?: AuthenticatedUser;
+  cookies: AuthCookies;
 }
 
 @Injectable()
@@ -32,8 +39,13 @@ export class OptionalAuthGuard implements CanActivate {
       .switchToHttp()
       .getRequest<OptionalAuthenticatedRequest>();
 
+    const cookieToken = request.cookies.cc_access_token;
+
     const authorization = request.headers.authorization;
-    const token = authorization?.replace(/^Bearer\s+/i, '').trim();
+
+    const headerToken = authorization?.replace(/^Bearer\s+/i, '').trim();
+
+    const token: string | undefined = cookieToken || headerToken;
 
     if (!token) {
       return true;
@@ -41,7 +53,9 @@ export class OptionalAuthGuard implements CanActivate {
 
     try {
       const payload = await this.verifier.verify(token);
+
       request.user = payload;
+
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token.');

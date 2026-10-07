@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -217,14 +218,31 @@ export class ReportsService {
 
     const reason = this.validateText(body.reason, 'reason', 1000);
 
+    const [reporterUser] = await this.dbService.db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, authenticatedUserId))
+      .limit(1);
+
+    if (reporterUser?.role === 'admin') {
+      throw new ForbiddenException('Administrators cannot report resources');
+    }
+
     const [resource] = await this.dbService.db
-      .select({ id: resources.id })
+      .select({
+        id: resources.id,
+        uploadedById: resources.uploadedById,
+      })
       .from(resources)
       .where(eq(resources.id, resourceId))
       .limit(1);
 
     if (!resource) {
       throw new NotFoundException('Resource not found');
+    }
+
+    if (resource.uploadedById === authenticatedUserId) {
+      throw new BadRequestException('You cannot report your own resource');
     }
 
     const [existing] = await this.dbService.db
@@ -312,6 +330,7 @@ export class ReportsService {
         status: row.resourceStatus,
         avgRating: row.resourceAvgRating,
         ratingCount: row.resourceRatingCount,
+        isBookmarked: false,
         creator: {
           id: row.uploaderId,
           firstName: row.uploaderFirstName,
@@ -365,13 +384,16 @@ export class ReportsService {
     fallback: number,
     name: string,
   ): number {
-    if (value === undefined) return fallback;
-
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
-      throw new BadRequestException(`${name} must be a positive integer`);
+    if (value === undefined) {
+      return fallback;
     }
 
-    const parsed = Number(value);
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && /^\d+$/.test(value)
+          ? Number(value)
+          : NaN;
 
     if (!Number.isSafeInteger(parsed) || parsed < 1) {
       throw new BadRequestException(`${name} must be a positive integer`);

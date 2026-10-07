@@ -2,12 +2,12 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
-  Post,
   HttpCode,
   HttpStatus,
-  UnauthorizedException,
+  Post,
   Req,
+  Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -17,15 +17,25 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
+import { ResendConfirmationDto } from './dto/resend-confirmation.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { AuthGuard } from './guards/auth.guard';
+import {
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  USERNAME_COOKIE,
+  clearAuthCookies,
+  readCookie,
+  setAuthCookies,
+} from './auth.cookies';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -74,11 +84,31 @@ export class AuthController {
     return this.authService.confirmEmail(confirmEmailDto);
   }
 
+  @Post('resend-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resend email confirmation code',
+    description:
+      'Sends a new confirmation code to an unconfirmed account. Always returns the same response so registered emails cannot be probed.',
+  })
+  @ApiBody({ type: ResendConfirmationDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Code sent if the account exists and is unconfirmed.',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too many attempts. Please try again later.',
+  })
+  async resendCode(@Body() resendConfirmationDto: ResendConfirmationDto) {
+    return this.authService.resendConfirmationCode(resendConfirmationDto);
+  }
+
   @Post('login')
   @ApiOperation({
     summary: 'Log in user',
     description:
-      'Authenticates a user with AWS Cognito and returns authentication tokens.',
+      'Authenticates a user with AWS Cognito and stores authentication tokens in HttpOnly cookies.',
   })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -89,8 +119,22 @@ export class AuthController {
     status: 401,
     description: 'Invalid email or password.',
   })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const tokens = await this.authService.login(loginDto);
+
+    setAuthCookies(
+      response,
+      tokens,
+      loginDto.email,
+      loginDto.rememberMe ?? false,
+    );
+
+    return {
+      message: 'Signed in successfully.',
+    };
   }
 
   @UseGuards(AuthGuard)
@@ -98,8 +142,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Get current authenticated user',
-    description:
-      'Returns the current Cognito user using the supplied Bearer access token.',
+    description: 'Returns the current authenticated user.',
   })
   @ApiResponse({
     status: 200,
@@ -110,9 +153,9 @@ export class AuthController {
     description: 'Missing or invalid access token.',
   })
   async getMe(@Req() request: Request) {
-    const authorization = request.headers.authorization;
-
-    const accessToken = authorization?.replace(/^Bearer\s+/i, '');
+    const accessToken =
+      readCookie(request, ACCESS_TOKEN_COOKIE) ??
+      request.headers.authorization?.replace(/^Bearer\s+/i, '');
 
     if (!accessToken) {
       throw new UnauthorizedException('Access token is required.');
@@ -127,27 +170,29 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Log out user',
-    description:
-      'Signs out the current user from AWS Cognito using the supplied Bearer access token.',
+    description: 'Signs out the current user from AWS Cognito.',
   })
   @ApiResponse({
     status: 200,
     description: 'User logged out successfully.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Missing or invalid access token.',
-  })
-  async logout(@Req() request: Request) {
-    const authorization = request.headers.authorization;
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const accessToken =
+      readCookie(request, ACCESS_TOKEN_COOKIE) ??
+      request.headers.authorization?.replace(/^Bearer\s+/i, '');
 
-    const accessToken = authorization?.replace(/^Bearer\s+/i, '');
-
-    if (!accessToken) {
-      throw new UnauthorizedException('Access token is required.');
+    if (accessToken) {
+      await this.authService.logout(accessToken);
     }
 
-    return this.authService.logout(accessToken);
+    clearAuthCookies(response);
+
+    return {
+      message: 'Logged out successfully.',
+    };
   }
 
   @Post('forgot-password')
@@ -161,13 +206,10 @@ export class AuthController {
     status: 201,
     description: 'Password reset code sent successfully.',
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Unable to process the password reset request.',
-  })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
+
   @Post('reset-password')
   @ApiOperation({
     summary: 'Reset password',
@@ -179,20 +221,34 @@ export class AuthController {
     status: 201,
     description: 'Password reset successfully.',
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid or expired password reset code.',
-  })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() refreshDto: RefreshTokenDto) {
-    return this.authService.refreshToken(
-      refreshDto.refreshToken,
-      refreshDto.email,
-    );
+  async refresh(
+    @Req() request: Request,
+    // Partial: the browser sends tokens via cookies, so the body is usually
+    // empty. A required DTO here would make ValidationPipe return 400.
+    @Body() refreshDto: Partial<RefreshTokenDto> = {},
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken =
+      readCookie(request, REFRESH_TOKEN_COOKIE) ?? refreshDto.refreshToken;
+
+    const email = readCookie(request, USERNAME_COOKIE) ?? refreshDto.email;
+
+    if (!refreshToken || !email) {
+      throw new UnauthorizedException('Refresh token is required.');
+    }
+
+    const tokens = await this.authService.refreshToken(refreshToken, email);
+
+    setAuthCookies(response, tokens, email, true);
+
+    return {
+      message: 'Session refreshed.',
+    };
   }
 }

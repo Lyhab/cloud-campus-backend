@@ -57,6 +57,7 @@ export class ResourcesService {
     }
 
     const sort = this.parseString(query.sort, 'sort') ?? 'newest';
+
     const allowedSorts = [
       'alphabetical',
       'newest',
@@ -107,8 +108,32 @@ export class ResourcesService {
       throw new BadRequestException('fileType must not be empty');
     }
 
+    const authenticatedUser = authenticatedUserId
+      ? await this.dbService.db
+          .select({ role: users.role })
+          .from(users)
+          .where(eq(users.id, authenticatedUserId))
+          .limit(1)
+      : [];
+
+    const isAdmin = authenticatedUser[0]?.role === 'admin';
+
+    const requestedView = this.parseString(query.view, 'view') ?? 'student';
+
+    if (!['admin', 'student'].includes(requestedView)) {
+      throw new BadRequestException('view must be admin or student');
+    }
+
+    if (requestedView === 'admin' && !isAdmin) {
+      throw new ForbiddenException('Only administrators can use admin view.');
+    }
+
     const statusFilter =
-      status === 'all' ? undefined : eq(resources.status, status);
+      requestedView === 'admin'
+        ? status === 'all'
+          ? undefined
+          : eq(resources.status, status)
+        : eq(resources.status, 'approved');
 
     const filters = and(
       filter === 'my-uploads'
@@ -125,18 +150,19 @@ export class ResourcesService {
         : undefined,
 
       courseId ? eq(resources.courseId, courseId) : undefined,
+
       fileType ? eq(resources.fileType, fileType) : undefined,
 
       filter === 'bookmarked'
         ? sql`exists (
-        select 1
-        from ${bookmarks}
-        where ${bookmarks.resourceId} = ${resources.id}
-          and ${bookmarks.userId} = ${authenticatedUserId}
-      )`
+          select 1
+          from ${bookmarks}
+          where ${bookmarks.resourceId} = ${resources.id}
+            and ${bookmarks.userId} = ${authenticatedUserId}
+        )`
         : undefined,
 
-      sort === 'top-rated' ? sql`${resources.ratingCount} >= 20` : undefined,
+      sort === 'top-rated' ? sql`${resources.ratingCount} >= 5` : undefined,
     );
 
     const orderBy =
@@ -156,6 +182,16 @@ export class ResourcesService {
               ]
             : [desc(resources.uploadedAt), asc(resources.id)];
 
+    // NEW: per-user bookmark flag, computed in the same query
+    const isBookmarkedSql = authenticatedUserId
+      ? sql<boolean>`exists (
+        select 1
+        from ${bookmarks}
+        where ${bookmarks.resourceId} = ${resources.id}
+          and ${bookmarks.userId} = ${authenticatedUserId}
+      )`
+      : sql<boolean>`false`;
+
     const [rows, totalRows, courseOptions, fileTypeRows] = await Promise.all([
       this.dbService.db
         .select({
@@ -171,12 +207,16 @@ export class ResourcesService {
           ratingCount: resources.ratingCount,
           uploadedAt: resources.uploadedAt,
           updatedAt: resources.updatedAt,
+
+          isBookmarked: isBookmarkedSql, // NEW
+
           creatorId: users.id,
           creatorFirstName: users.firstName,
           creatorMiddleName: users.middleName,
           creatorLastName: users.lastName,
           creatorEmail: users.email,
           creatorProfilePhotoUrl: users.profilePhotoUrl,
+
           courseId: courses.id,
           courseCode: courses.code,
           courseName: courses.name,
@@ -194,7 +234,6 @@ export class ResourcesService {
         .from(resources)
         .where(filters),
 
-      // Independent filter options: all resources.
       this.dbService.db
         .selectDistinct({
           id: courses.id,
@@ -203,6 +242,7 @@ export class ResourcesService {
         })
         .from(resources)
         .innerJoin(courses, eq(resources.courseId, courses.id))
+        .where(statusFilter)
         .orderBy(asc(courses.code), asc(courses.name)),
 
       this.dbService.db
@@ -223,8 +263,20 @@ export class ResourcesService {
     };
   }
 
-  async getResource(resourceId: string): Promise<ResourceDto> {
+  async getResource(
+    resourceId: string,
+    authenticatedUserId?: string,
+  ): Promise<ResourceDto> {
     this.validateUuid(resourceId, 'resourceId');
+
+    const isBookmarkedSql = authenticatedUserId
+      ? sql<boolean>`exists (
+        select 1
+        from ${bookmarks}
+        where ${bookmarks.resourceId} = ${resources.id}
+          and ${bookmarks.userId} = ${authenticatedUserId}
+      )`
+      : sql<boolean>`false`;
 
     const [row] = await this.dbService.db
       .select({
@@ -238,6 +290,7 @@ export class ResourcesService {
         status: resources.status,
         avgRating: resources.avgRating,
         ratingCount: resources.ratingCount,
+        isBookmarked: isBookmarkedSql,
         uploadedAt: resources.uploadedAt,
         updatedAt: resources.updatedAt,
         creatorId: users.id,
@@ -836,6 +889,7 @@ export class ResourcesService {
     status: string;
     avgRating: string;
     ratingCount: number;
+    isBookmarked?: boolean;
     uploadedAt: Date;
     updatedAt: Date;
     creatorId: string;
@@ -859,6 +913,7 @@ export class ResourcesService {
       status: row.status,
       avgRating: row.avgRating,
       ratingCount: row.ratingCount,
+      isBookmarked: row.isBookmarked ?? false,
       creator: {
         id: row.creatorId,
         firstName: row.creatorFirstName,
@@ -958,13 +1013,16 @@ export class ResourcesService {
     fallback: number,
     name: string,
   ): number {
-    if (value === undefined) return fallback;
-
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
-      throw new BadRequestException(`${name} must be a positive integer`);
+    if (value === undefined) {
+      return fallback;
     }
 
-    const parsed = Number(value);
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && /^\d+$/.test(value)
+          ? Number(value)
+          : NaN;
 
     if (!Number.isSafeInteger(parsed) || parsed < 1) {
       throw new BadRequestException(`${name} must be a positive integer`);

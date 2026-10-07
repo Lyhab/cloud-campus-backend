@@ -15,6 +15,7 @@ import {
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -82,7 +83,11 @@ export class ReportsController {
   @ApiBody({ type: CreateReportDto })
   @ApiCreatedResponse({ type: ReportDto })
   @ApiBadRequestResponse({
-    description: 'Invalid report payload',
+    description:
+      'Invalid report payload, or you tried to report your own resource',
+  })
+  @ApiForbiddenResponse({
+    description: 'Administrators cannot report resources',
   })
   @ApiNotFoundResponse({
     description: 'Resource not found',

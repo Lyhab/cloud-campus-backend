@@ -40,6 +40,8 @@ import { ListCoursesQueryDto } from './dto/list-courses-query.dto';
 import { PaginatedCourseStudentsDto } from './dto/paginated-course-students.dto';
 import { PaginatedCoursesDto } from './dto/paginated-courses.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { EnrollStudentsDto } from './dto/enroll-students.dto';
+import { PaginatedAvailableStudentsDto } from './dto/paginated-available-students.dto';
 
 @ApiTags('Courses')
 @Controller('courses')
@@ -62,7 +64,6 @@ export class CoursesController {
     return this.coursesService.listCourses(query, request.user?.sub);
   }
 
-  @UseGuards(AuthGuard)
   @ApiBearerAuth('access-token')
   @Get(':courseId/students')
   @ApiOperation({ summary: 'List students enrolled in a course' })
@@ -83,6 +84,7 @@ export class CoursesController {
     return this.coursesService.listCourseStudents(courseId, query);
   }
 
+  @UseGuards(OptionalAuthGuard)
   @Get(':courseId')
   @ApiOperation({ summary: 'Get course details' })
   @ApiParam({
@@ -93,8 +95,11 @@ export class CoursesController {
   @ApiOkResponse({ type: CourseDto })
   @ApiBadRequestResponse({ description: 'Invalid course ID' })
   @ApiNotFoundResponse({ description: 'Course not found' })
-  getCourse(@Param('courseId') courseId: string): Promise<CourseDto> {
-    return this.coursesService.getCourse(courseId);
+  getCourse(
+    @Param('courseId') courseId: string,
+    @Req() request: OptionalAuthenticatedRequest,
+  ): Promise<CourseDto> {
+    return this.coursesService.getCourse(courseId, request.user?.sub);
   }
 
   @UseGuards(AuthGuard, AdminGuard)
@@ -141,35 +146,31 @@ export class CoursesController {
 
   @UseGuards(AuthGuard, AdminGuard)
   @ApiBearerAuth('access-token')
-  @Post(':courseId/students/:userId')
+  @Post(':courseId/students')
   @ApiOperation({
-    summary: 'Enroll a student in a course (admin only)',
+    summary: 'Enroll students in a course (admin only)',
   })
   @ApiParam({
     name: 'courseId',
     type: String,
     format: 'uuid',
   })
-  @ApiParam({
-    name: 'userId',
-    type: String,
-    format: 'uuid',
-  })
-  @ApiCreatedResponse({ type: EnrollmentDto })
+  @ApiBody({ type: EnrollStudentsDto })
+  @ApiCreatedResponse({ type: [EnrollmentDto] })
   @ApiBadRequestResponse({
-    description: 'User is not active or request is invalid',
+    description: 'Invalid userIds, or a user is not an active student',
   })
   @ApiNotFoundResponse({
-    description: 'Course or user not found',
+    description: 'Course or a user not found',
   })
   @ApiConflictResponse({
-    description: 'Already enrolled in this course',
+    description: 'A user is already enrolled in this course',
   })
-  enrollStudent(
+  enrollStudents(
     @Param('courseId') courseId: string,
-    @Param('userId') userId: string,
-  ): Promise<EnrollmentDto> {
-    return this.coursesService.enrollStudent(courseId, userId);
+    @Body() body: EnrollStudentsDto,
+  ): Promise<EnrollmentDto[]> {
+    return this.coursesService.enrollStudents(courseId, body);
   }
 
   @UseGuards(AuthGuard, AdminGuard)
@@ -275,5 +276,24 @@ export class CoursesController {
     @Param('userId') userId: string,
   ): Promise<{ message: string }> {
     return this.coursesService.unenrollStudent(courseId, userId);
+  }
+
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth('access-token')
+  @Get(':courseId/students/available')
+  @ApiOperation({
+    summary: 'List active students not enrolled in a course (admin only)',
+  })
+  @ApiParam({ name: 'courseId', type: String, format: 'uuid' })
+  @ApiOkResponse({ type: PaginatedAvailableStudentsDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid course ID or query parameter',
+  })
+  @ApiNotFoundResponse({ description: 'Course not found' })
+  listAvailableStudents(
+    @Param('courseId') courseId: string,
+    @Query() query: ListCourseStudentsQueryDto,
+  ): Promise<PaginatedAvailableStudentsDto> {
+    return this.coursesService.listAvailableStudents(courseId, query);
   }
 }

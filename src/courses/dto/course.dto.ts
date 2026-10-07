@@ -19,6 +19,9 @@ export class CourseDto {
   @ApiProperty({ example: 24 })
   studentCount!: number;
 
+  @ApiProperty({ example: 16 })
+  resourceCount!: number;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 

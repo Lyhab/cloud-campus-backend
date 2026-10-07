@@ -24,7 +24,7 @@ export class SearchService {
     }
 
     const searchTerm = `%${query.q.trim()}%`;
-    const limit = this.parseLimit(query.limit);
+    const limit = this.parseLimit(query.limit, 10);
 
     const [resourceResults, courseResults] = await Promise.all([
       this.dbService.db
@@ -45,10 +45,7 @@ export class SearchService {
             user.role === 'admin'
               ? undefined
               : eq(resources.status, 'approved'),
-            or(
-              ilike(resources.title, searchTerm),
-              ilike(resources.description, searchTerm),
-            ),
+            ilike(resources.title, searchTerm),
           ),
         )
         .limit(limit),
@@ -61,11 +58,7 @@ export class SearchService {
         })
         .from(courses)
         .where(
-          or(
-            ilike(courses.code, searchTerm),
-            ilike(courses.name, searchTerm),
-            ilike(courses.description, searchTerm),
-          ),
+          or(ilike(courses.code, searchTerm), ilike(courses.name, searchTerm)),
         )
         .limit(limit),
     ]);
@@ -127,13 +120,17 @@ export class SearchService {
     };
   }
 
-  private parseLimit(value?: string): number {
-    const limit = Number(value ?? 10);
+  private parseLimit(
+    value: string | number | undefined,
+    defaultValue: number,
+    max = 100,
+  ) {
+    const parsed = Number(value ?? defaultValue);
 
-    if (!Number.isInteger(limit) || limit < 1) {
-      return 10;
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return defaultValue;
     }
 
-    return Math.min(limit, 100);
+    return Math.min(parsed, max);
   }
 }

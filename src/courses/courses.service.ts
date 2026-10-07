@@ -5,7 +5,18 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
+
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import { DbService } from '../db/db.service';
 import { S3Service } from '../s3/s3.service';
@@ -19,6 +30,8 @@ import { ListCoursesQueryDto } from './dto/list-courses-query.dto';
 import { PaginatedCourseStudentsDto } from './dto/paginated-course-students.dto';
 import { PaginatedCoursesDto } from './dto/paginated-courses.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { EnrollStudentsDto } from './dto/enroll-students.dto';
+import { PaginatedAvailableStudentsDto } from './dto/paginated-available-students.dto';
 
 @Injectable()
 export class CoursesService {
@@ -32,6 +45,7 @@ export class CoursesService {
     authenticatedUserId?: string,
   ): Promise<PaginatedCoursesDto> {
     const page = this.parsePositiveInteger(query.page, 1, 'page');
+
     const limit = this.parsePositiveInteger(query.limit, 20, 'limit');
 
     if (limit > 100) {
@@ -51,7 +65,9 @@ export class CoursesService {
     }
 
     const search = this.parseString(query.search, 'search')?.trim();
+
     const code = this.parseString(query.code, 'code')?.trim();
+
     const filter = this.parseString(query.filter, 'filter');
 
     if (filter !== undefined && filter !== 'my-courses') {
@@ -65,27 +81,56 @@ export class CoursesService {
     }
 
     const studentCount = sql<number>`
+  (
     select count(*)::int
     from ${enrollments}
-    where ${enrollments.courseId} = ${courses.id}
-  `;
+    where ${enrollments.courseId} = "courses"."id"
+  )
+`;
+
+    const resourceCount = sql<number>`
+  (
+    select count(*)::int
+    from ${resources}
+    where ${resources.courseId} = "courses"."id"
+      and ${resources.status} = 'approved'
+  )
+`;
+
+    /**
+     * Check whether the authenticated user is enrolled
+     * in each course. Guests are never considered enrolled.
+     */
+    const isEnrolled = authenticatedUserId
+      ? sql<boolean>`
+        exists (
+          select 1
+          from ${enrollments}
+          where ${enrollments.courseId} = ${courses.id}
+            and ${enrollments.userId} = ${authenticatedUserId}
+        )
+      `
+      : sql<boolean>`false`;
 
     const filters = and(
       search
         ? or(
             ilike(courses.name, `%${search}%`),
             ilike(courses.code, `%${search}%`),
-            ilike(courses.description, `%${search}%`),
           )
         : undefined,
+
       code ? ilike(courses.code, `${code}%`) : undefined,
+
       filter === 'my-courses'
-        ? sql`exists (
-          select 1
-          from ${enrollments}
-          where ${enrollments.courseId} = ${courses.id}
-            and ${enrollments.userId} = ${authenticatedUserId}
-        )`
+        ? sql`
+          exists (
+            select 1
+            from ${enrollments}
+            where ${enrollments.courseId} = ${courses.id}
+              and ${enrollments.userId} = ${authenticatedUserId}
+          )
+        `
         : undefined,
     );
 
@@ -96,6 +141,10 @@ export class CoursesService {
           ? [asc(courses.createdAt), asc(courses.id)]
           : [desc(courses.createdAt), asc(courses.id)];
 
+    /**
+     * Get available course code prefixes.
+     * COMP809 -> COMP, INFS803 -> INFS
+     */
     const courseCodes = await this.dbService.db
       .selectDistinct({
         code: courses.code,
@@ -110,6 +159,9 @@ export class CoursesService {
       ),
     ].sort();
 
+    /**
+     * Fetch courses and total count.
+     */
     const [data, totalRows] = await Promise.all([
       this.dbService.db
         .select({
@@ -117,7 +169,11 @@ export class CoursesService {
           code: courses.code,
           name: courses.name,
           description: courses.description,
+
           studentCount,
+          resourceCount, // NEW
+          isEnrolled,
+
           createdAt: courses.createdAt,
           updatedAt: courses.updatedAt,
         })
@@ -127,18 +183,56 @@ export class CoursesService {
         .limit(limit)
         .offset((page - 1) * limit),
 
-      this.dbService.db.select({ total: count() }).from(courses).where(filters),
+      this.dbService.db
+        .select({
+          total: count(),
+        })
+        .from(courses)
+        .where(filters),
     ]);
 
-    return { data, codes, page, limit, total: totalRows[0].total };
+    return {
+      data,
+      codes,
+      page,
+      limit,
+      total: totalRows[0].total,
+    };
   }
 
-  async getCourse(courseId: string): Promise<CourseDto> {
-    const studentCount = sql<number>`(
+  async getCourse(
+    courseId: string,
+    authenticatedUserId?: string,
+  ): Promise<CourseDto> {
+    this.validateUuid(courseId, 'courseId');
+
+    const studentCount = sql<number>`
+    (
       select count(*)::int
       from ${enrollments}
       where ${enrollments.courseId} = ${courses.id}
-    )`;
+    )
+  `;
+
+    const resourceCount = sql<number>`
+    (
+      select count(*)::int
+      from ${resources}
+      where ${resources.courseId} = ${courses.id}
+        and ${resources.status} = 'approved'
+    )
+  `;
+
+    const isEnrolled = authenticatedUserId
+      ? sql<boolean>`
+        exists (
+          select 1
+          from ${enrollments}
+          where ${enrollments.courseId} = ${courses.id}
+            and ${enrollments.userId} = ${authenticatedUserId}
+        )
+      `
+      : sql<boolean>`false`;
 
     const [course] = await this.dbService.db
       .select({
@@ -147,6 +241,8 @@ export class CoursesService {
         name: courses.name,
         description: courses.description,
         studentCount,
+        resourceCount,
+        isEnrolled,
         createdAt: courses.createdAt,
         updatedAt: courses.updatedAt,
       })
@@ -168,15 +264,19 @@ export class CoursesService {
     await this.requireCourse(courseId);
 
     const page = this.parsePositiveInteger(query.page, 1, 'page');
+
     const limit = this.parsePositiveInteger(query.limit, 20, 'limit');
+
     if (limit > 100) {
       throw new BadRequestException('limit must be at most 100');
     }
+
     if (!Number.isSafeInteger((page - 1) * limit)) {
       throw new BadRequestException('page is too large');
     }
 
     const sort = this.parseString(query.sort, 'sort') ?? 'alphabetical';
+
     if (!['alphabetical', 'newest', 'oldest'].includes(sort)) {
       throw new BadRequestException(
         'sort must be alphabetical, newest, or oldest',
@@ -184,10 +284,19 @@ export class CoursesService {
     }
 
     const search = this.parseString(query.search, 'search')?.trim();
-    const name = sql<string>`concat_ws(' ', ${users.firstName}, ${users.middleName}, ${users.lastName})`;
+
+    const name = sql<string>`
+      concat_ws(
+        ' ',
+        ${users.firstName},
+        ${users.middleName},
+        ${users.lastName}
+      )
+    `;
 
     const filters = and(
       eq(enrollments.courseId, courseId),
+
       search
         ? or(ilike(name, `%${search}%`), ilike(users.email, `%${search}%`))
         : undefined,
@@ -217,8 +326,11 @@ export class CoursesService {
         .orderBy(...orderBy)
         .limit(limit)
         .offset((page - 1) * limit),
+
       this.dbService.db
-        .select({ total: count() })
+        .select({
+          total: count(),
+        })
         .from(enrollments)
         .innerJoin(users, eq(users.id, enrollments.userId))
         .where(filters),
@@ -227,13 +339,19 @@ export class CoursesService {
     const data = await Promise.all(
       rows.map(async (student) => ({
         ...student,
+
         profilePhotoUrl: student.profilePhotoUrl
           ? await this.s3Service.getPresignedUrl(student.profilePhotoUrl)
           : null,
       })),
     );
 
-    return { data, page, limit, total: totalRows[0].total };
+    return {
+      data,
+      page,
+      limit,
+      total: totalRows[0].total,
+    };
   }
 
   async createCourse(body: CreateCourseDto): Promise<CourseDto> {
@@ -242,7 +360,9 @@ export class CoursesService {
     }
 
     const code = this.validateText(body.code, 'code', 50);
+
     const name = this.validateText(body.name, 'name', 255);
+
     const description =
       'description' in body
         ? this.validateText(body.description, 'description', 10_000, true)
@@ -251,6 +371,7 @@ export class CoursesService {
     await this.assertCodeAvailable(code);
 
     const now = new Date();
+
     const [course] = await this.dbService.db
       .insert(courses)
       .values({
@@ -269,7 +390,11 @@ export class CoursesService {
         updatedAt: courses.updatedAt,
       });
 
-    return { ...course, studentCount: 0 };
+    return {
+      ...course,
+      studentCount: 0,
+      resourceCount: 0,
+    };
   }
 
   async updateCourse(
@@ -283,10 +408,13 @@ export class CoursesService {
     }
 
     const allowed = ['code', 'name', 'description'];
+
     const keys = Object.keys(body);
+
     if (keys.length === 0) {
       throw new BadRequestException('Supply at least one course field');
     }
+
     if (keys.some((key) => !allowed.includes(key))) {
       throw new BadRequestException('Supply only supported course fields');
     }
@@ -302,6 +430,7 @@ export class CoursesService {
 
     if ('code' in body) {
       update.code = this.validateText(body.code, 'code', 50);
+
       await this.assertCodeAvailable(update.code, courseId);
     }
 
@@ -342,7 +471,9 @@ export class CoursesService {
     await this.requireCourse(courseId);
 
     const [resource] = await this.dbService.db
-      .select({ id: resources.id })
+      .select({
+        id: resources.id,
+      })
       .from(resources)
       .where(eq(resources.courseId, courseId))
       .limit(1);
@@ -355,10 +486,13 @@ export class CoursesService {
 
     await this.dbService.db.transaction(async (tx) => {
       await tx.delete(enrollments).where(eq(enrollments.courseId, courseId));
+
       await tx.delete(courses).where(eq(courses.id, courseId));
     });
 
-    return { message: 'Course deleted successfully' };
+    return {
+      message: 'Course deleted successfully',
+    };
   }
 
   async enrollSelf(
@@ -368,11 +502,57 @@ export class CoursesService {
     return this.enrollUser(courseId, authenticatedUserId);
   }
 
-  async enrollStudent(
+  async enrollStudents(
     courseId: string,
-    userId: string,
-  ): Promise<EnrollmentDto> {
-    return this.enrollUser(courseId, userId);
+    body: EnrollStudentsDto,
+  ): Promise<EnrollmentDto[]> {
+    await this.requireCourse(courseId);
+
+    const userIds = [...new Set(body.userIds)];
+
+    const found = await this.dbService.db
+      .select({
+        id: users.id,
+        role: users.role,
+        status: users.status,
+      })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    if (found.length !== userIds.length) {
+      throw new NotFoundException('One or more users not found');
+    }
+
+    if (found.some((u) => u.role !== 'student' || u.status !== 'active')) {
+      throw new BadRequestException('Only active students can be enrolled');
+    }
+
+    const existing = await this.dbService.db
+      .select({ userId: enrollments.userId })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.courseId, courseId),
+          inArray(enrollments.userId, userIds),
+        ),
+      );
+
+    if (existing.length > 0) {
+      throw new ConflictException(
+        'One or more users are already enrolled in this course',
+      );
+    }
+
+    const now = new Date();
+
+    return this.dbService.db
+      .insert(enrollments)
+      .values(userIds.map((userId) => ({ userId, courseId, joinedAt: now })))
+      .returning({
+        userId: enrollments.userId,
+        courseId: enrollments.courseId,
+        joinedAt: enrollments.joinedAt,
+      });
   }
 
   async unenrollSelf(
@@ -395,6 +575,74 @@ export class CoursesService {
       userId,
       'Student is not enrolled in this course',
     );
+  }
+
+  async listAvailableStudents(
+    courseId: string,
+    query: ListCourseStudentsQueryDto,
+  ): Promise<PaginatedAvailableStudentsDto> {
+    await this.requireCourse(courseId);
+
+    const page = this.parsePositiveInteger(query.page, 1, 'page');
+    const limit = this.parsePositiveInteger(query.limit, 20, 'limit');
+
+    if (limit > 100) {
+      throw new BadRequestException('limit must be at most 100');
+    }
+
+    if (!Number.isSafeInteger((page - 1) * limit)) {
+      throw new BadRequestException('page is too large');
+    }
+
+    const search = this.parseString(query.search, 'search')?.trim();
+
+    const name = sql<string>`
+    concat_ws(' ', ${users.firstName}, ${users.middleName}, ${users.lastName})
+  `;
+
+    const filters = and(
+      eq(users.role, 'student'),
+      eq(users.status, 'active'),
+      sql`not exists (
+      select 1
+      from ${enrollments}
+      where ${enrollments.userId} = ${users.id}
+        and ${enrollments.courseId} = ${courseId}
+    )`,
+      search
+        ? or(ilike(name, `%${search}%`), ilike(users.email, `%${search}%`))
+        : undefined,
+    );
+
+    const [rows, totalRows] = await Promise.all([
+      this.dbService.db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          middleName: users.middleName,
+          lastName: users.lastName,
+          email: users.email,
+          profilePhotoUrl: users.profilePhotoUrl,
+        })
+        .from(users)
+        .where(filters)
+        .orderBy(asc(users.firstName), asc(users.lastName), asc(users.id))
+        .limit(limit)
+        .offset((page - 1) * limit),
+
+      this.dbService.db.select({ total: count() }).from(users).where(filters),
+    ]);
+
+    const data = await Promise.all(
+      rows.map(async (student) => ({
+        ...student,
+        profilePhotoUrl: student.profilePhotoUrl
+          ? await this.s3Service.getPresignedUrl(student.profilePhotoUrl)
+          : null,
+      })),
+    );
+
+    return { data, page, limit, total: totalRows[0].total };
   }
 
   private async enrollUser(
@@ -465,7 +713,9 @@ export class CoursesService {
     await this.requireCourse(courseId);
 
     const [existing] = await this.dbService.db
-      .select({ userId: enrollments.userId })
+      .select({
+        userId: enrollments.userId,
+      })
       .from(enrollments)
       .where(
         and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId)),
@@ -482,12 +732,16 @@ export class CoursesService {
         and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId)),
       );
 
-    return { message: 'Successfully unenrolled from the course' };
+    return {
+      message: 'Successfully unenrolled from the course',
+    };
   }
 
   private async requireCourse(courseId: string): Promise<void> {
     const [course] = await this.dbService.db
-      .select({ id: courses.id })
+      .select({
+        id: courses.id,
+      })
       .from(courses)
       .where(eq(courses.id, courseId))
       .limit(1);
@@ -502,7 +756,9 @@ export class CoursesService {
     excludeCourseId?: string,
   ): Promise<void> {
     const [existing] = await this.dbService.db
-      .select({ id: courses.id })
+      .select({
+        id: courses.id,
+      })
       .from(courses)
       .where(eq(courses.code, code))
       .limit(1);
@@ -517,22 +773,33 @@ export class CoursesService {
     fallback: number,
     name: string,
   ): number {
-    if (value === undefined) return fallback;
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
-      throw new BadRequestException(`${name} must be a positive integer`);
+    if (value === undefined) {
+      return fallback;
     }
-    const parsed = Number(value);
+
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && /^\d+$/.test(value)
+          ? Number(value)
+          : NaN;
+
     if (!Number.isSafeInteger(parsed) || parsed < 1) {
       throw new BadRequestException(`${name} must be a positive integer`);
     }
+
     return parsed;
   }
 
   private parseString(value: unknown, name: string): string | undefined {
-    if (value === undefined) return undefined;
+    if (value === undefined) {
+      return undefined;
+    }
+
     if (typeof value !== 'string') {
       throw new BadRequestException(`${name} must be a string`);
     }
+
     return value;
   }
 
@@ -542,7 +809,9 @@ export class CoursesService {
     maxLength: number,
     nullable: true,
   ): string | null;
+
   private validateText(value: unknown, name: string, maxLength: number): string;
+
   private validateText(
     value: unknown,
     name: string,
@@ -552,6 +821,7 @@ export class CoursesService {
     if (nullable && (value === null || value === undefined || value === '')) {
       return null;
     }
+
     if (
       typeof value !== 'string' ||
       !value.trim() ||
@@ -561,6 +831,16 @@ export class CoursesService {
         `${name} must be a nonempty string of at most ${maxLength} characters${nullable ? ' or null' : ''}`,
       );
     }
+
     return value.trim();
+  }
+
+  private validateUuid(value: string, name: string): void {
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!uuidRegex.test(value)) {
+      throw new BadRequestException(`${name} must be a valid UUID`);
+    }
   }
 }

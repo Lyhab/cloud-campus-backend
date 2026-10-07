@@ -158,20 +158,34 @@ export class UsersController {
   @Patch(':userId/password')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Change user password' })
-  @ApiParam({ name: 'userId', type: String, format: 'uuid' })
-  @ApiBody({ type: ChangePasswordDto })
-  @ApiOkResponse({ description: 'Password changed successfully' })
-  @ApiBadRequestResponse({
-    description: 'Invalid password or password confirmation',
+  @ApiParam({
+    name: 'userId',
+    type: String,
+    format: 'uuid',
   })
-  @ApiNotFoundResponse({ description: 'User not found' })
-  changePassword(
+  @ApiOkResponse({
+    schema: {
+      example: {
+        message: 'Password changed successfully.',
+      },
+    },
+  })
+  async changePassword(
     @Param('userId') userId: string,
     @Body() body: ChangePasswordDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     const authorization = request.headers.authorization;
-    const accessToken = authorization?.replace(/^Bearer\s+/i, '').trim();
+
+    let accessToken = authorization?.replace(/^Bearer\s+/i, '').trim();
+
+    if (!accessToken) {
+      const cookies = request.cookies as {
+        cc_access_token?: string;
+      };
+
+      accessToken = cookies.cc_access_token;
+    }
 
     if (!accessToken) {
       throw new UnauthorizedException('Access token is required.');
