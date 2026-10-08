@@ -1,10 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class ListUsersQueryDto {
   @ApiPropertyOptional({
     description: 'Search by user name or email',
     example: 'john',
   })
+  @IsOptional()
+  @IsString()
   search?: string;
 
   @ApiPropertyOptional({
@@ -12,6 +16,8 @@ export class ListUsersQueryDto {
     enum: ['admin', 'student'],
     example: 'student',
   })
+  @IsOptional()
+  @IsIn(['admin', 'student'])
   role?: 'admin' | 'student';
 
   @ApiPropertyOptional({
@@ -19,6 +25,8 @@ export class ListUsersQueryDto {
     enum: ['pending', 'active', 'inactive'],
     example: 'active',
   })
+  @IsOptional()
+  @IsIn(['pending', 'active', 'inactive'])
   status?: 'pending' | 'active' | 'inactive';
 
   @ApiPropertyOptional({
@@ -27,6 +35,8 @@ export class ListUsersQueryDto {
     default: 'newest',
     example: 'newest',
   })
+  @IsOptional()
+  @IsIn(['alphabetical', 'newest', 'oldest'])
   sort?: 'alphabetical' | 'newest' | 'oldest';
 
   @ApiPropertyOptional({
@@ -36,7 +46,11 @@ export class ListUsersQueryDto {
     minimum: 1,
     example: 1,
   })
-  page?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @ApiPropertyOptional({
     description: 'Number of users per page',
@@ -46,5 +60,10 @@ export class ListUsersQueryDto {
     maximum: 100,
     example: 20,
   })
-  limit?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

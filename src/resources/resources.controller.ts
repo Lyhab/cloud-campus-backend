@@ -95,8 +95,11 @@ export class ResourcesController {
   @ApiNotFoundResponse({
     description: 'Resource not found',
   })
-  getResource(@Param('resourceId') resourceId: string): Promise<ResourceDto> {
-    return this.resourcesService.getResource(resourceId);
+  getResource(
+    @Param('resourceId') resourceId: string,
+    @Req() request: OptionalAuthenticatedRequest,
+  ): Promise<ResourceDto> {
+    return this.resourcesService.getResource(resourceId, request.user?.sub);
   }
 
   @Get(':resourceId/download')

@@ -62,6 +62,9 @@ export class ResourceDto {
   @ApiProperty()
   ratingCount!: number;
 
+  @ApiProperty()
+  isBookmarked!: boolean;
+
   @ApiProperty({ type: () => ResourceCreatorDto })
   creator!: ResourceCreatorDto;
 

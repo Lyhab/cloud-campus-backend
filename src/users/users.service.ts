@@ -10,12 +10,12 @@ import { AuthService } from '../auth/auth.service';
 import { DbService } from '../db/db.service';
 import { S3Service } from '../s3/s3.service';
 
-import { users } from '../db/schema';
+import { enrollments, resources, users } from '../db/schema';
 
 import { ChangeUserRoleDto } from './dto/change-user-role.dto';
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
-import { UserDto } from './dto/user.dto';
+import { UserDto, UserStatsDto } from './dto/user.dto';
 import { PaginatedUsersDto } from './dto/paginated-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -125,7 +125,12 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return this.withSignedPhoto(user);
+    const [signedUser, stats] = await Promise.all([
+      this.withSignedPhoto(user),
+      this.getUserStats(userId),
+    ]);
+
+    return { ...signedUser, stats };
   }
 
   async updateUser(
@@ -139,10 +144,7 @@ export class UsersService {
     },
   ): Promise<UserDto> {
     const [requestingUser] = await this.dbService.db
-      .select({
-        id: users.id,
-        role: users.role,
-      })
+      .select({ id: users.id, role: users.role })
       .from(users)
       .where(eq(users.id, authenticatedUserId))
       .limit(1);
@@ -156,9 +158,7 @@ export class UsersService {
     }
 
     const [existingUser] = await this.dbService.db
-      .select({
-        profilePhotoUrl: users.profilePhotoUrl,
-      })
+      .select({ profilePhotoUrl: users.profilePhotoUrl })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -167,22 +167,19 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const allowed = ['firstName', 'middleName', 'lastName'];
-
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       throw new BadRequestException('Body must be an object');
     }
 
-    const keys = Object.keys(body);
+    const hasFields =
+      body.firstName !== undefined ||
+      body.middleName !== undefined ||
+      body.lastName !== undefined;
 
-    if (keys.length === 0 && !profilePhoto) {
+    if (!hasFields && !profilePhoto) {
       throw new BadRequestException(
         'Supply at least one profile field or profile photo',
       );
-    }
-
-    if (keys.some((key) => !allowed.includes(key))) {
-      throw new BadRequestException('Supply only supported profile fields');
     }
 
     const update: {
@@ -195,20 +192,18 @@ export class UsersService {
       updatedAt: new Date(),
     };
 
-    if ('firstName' in body) {
+    if (body.firstName !== undefined) {
       update.firstName = this.validateText(body.firstName, 'firstName', 100);
     }
 
-    if ('middleName' in body) {
-      update.middleName = this.validateText(
-        body.middleName,
-        'middleName',
-        100,
-        true,
-      );
+    if (body.middleName !== undefined) {
+      const middle = body.middleName?.trim();
+      update.middleName = middle
+        ? this.validateText(middle, 'middleName', 100)
+        : null;
     }
 
-    if ('lastName' in body) {
+    if (body.lastName !== undefined) {
       update.lastName = this.validateText(body.lastName, 'lastName', 100);
     }
 
@@ -217,8 +212,7 @@ export class UsersService {
         throw new BadRequestException('Profile photo must be an image');
       }
 
-      const key =
-        `profiles/${userId}/` + `${Date.now()}-${profilePhoto.originalname}`;
+      const key = `profiles/${userId}/${Date.now()}-${profilePhoto.originalname}`;
 
       await this.s3Service.upload(
         key,
@@ -362,19 +356,58 @@ export class UsersService {
     );
   }
 
+  private async getUserStats(userId: string): Promise<UserStatsDto> {
+    const [[courses], [uploads], [downloads]] = await Promise.all([
+      // Courses the user has joined
+      this.dbService.db
+        .select({ total: count() })
+        .from(enrollments)
+        .where(eq(enrollments.userId, userId)),
+
+      // Resources the user has uploaded
+      this.dbService.db
+        .select({ total: count() })
+        .from(resources)
+        .where(eq(resources.uploadedById, userId)),
+
+      // Total downloads across all of the user's resources
+      this.dbService.db
+        .select({
+          total: sql<number>`coalesce(sum(${resources.downloads}), 0)`.mapWith(
+            Number,
+          ),
+        })
+        .from(resources)
+        .where(eq(resources.uploadedById, userId)),
+    ]);
+
+    return {
+      coursesJoined: courses.total,
+      resourcesUploaded: uploads.total,
+      totalDownloads: downloads.total,
+    };
+  }
+
   private parsePositiveInteger(
     value: unknown,
     fallback: number,
     name: string,
   ): number {
-    if (value === undefined) return fallback;
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
-      throw new BadRequestException(`${name} must be a positive integer`);
+    if (value === undefined) {
+      return fallback;
     }
-    const parsed = Number(value);
+
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && /^\d+$/.test(value)
+          ? Number(value)
+          : NaN;
+
     if (!Number.isSafeInteger(parsed) || parsed < 1) {
       throw new BadRequestException(`${name} must be a positive integer`);
     }
+
     return parsed;
   }
 

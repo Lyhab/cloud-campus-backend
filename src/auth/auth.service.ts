@@ -1,29 +1,42 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
+import {
+  CognitoIdentityProviderClient,
+  ConfirmForgotPasswordCommand,
+  ConfirmSignUpCommand,
+  ForgotPasswordCommand,
+  GetUserCommand,
+  GlobalSignOutCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
+  ChangePasswordCommand,
+  ResendConfirmationCodeCommand,
+  type SignUpCommandOutput,
+  type InitiateAuthCommandOutput,
+  type GetUserCommandOutput,
+} from '@aws-sdk/client-cognito-identity-provider';
+import { createHmac } from 'crypto';
+
+import { DbService } from '../db/db.service';
+import { enrollments, resources, users } from '../db/schema';
+import { S3Service } from '../s3/s3.service';
+import { UserStatsDto } from '../users/dto/user.dto';
+
+import { RegisterDto } from './dto/register.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { RegisterDto } from './dto/register.dto';
-import { S3Service } from '../s3/s3.service';
-
-import {
-  CognitoIdentityProviderClient,
-  ConfirmSignUpCommand,
-  GetUserCommand,
-  InitiateAuthCommand,
-  GlobalSignOutCommand,
-  SignUpCommand,
-  ForgotPasswordCommand,
-  ConfirmForgotPasswordCommand,
-  ChangePasswordCommand,
-} from '@aws-sdk/client-cognito-identity-provider';
-
-import { createHmac } from 'crypto';
-
-import { DbService } from '../db/db.service';
-import { users } from '../db/schema';
+import { ResendConfirmationDto } from './dto/resend-confirmation.dto';
 
 @Injectable()
 export class AuthService {
@@ -34,73 +47,108 @@ export class AuthService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly s3Service: S3Service,
     private readonly dbService: DbService,
+    private readonly s3Service: S3Service,
   ) {
-    const region = this.configService.getOrThrow<string>('AWS_REGION');
+    const region = this.configService.get<string>('AWS_REGION');
 
-    this.userPoolId = this.configService.getOrThrow<string>(
-      'COGNITO_USER_POOL_ID',
-    );
+    this.userPoolId = this.configService.get<string>('COGNITO_USER_POOL_ID')!;
 
-    this.clientId = this.configService.getOrThrow<string>('COGNITO_CLIENT_ID');
+    this.clientId = this.configService.get<string>('COGNITO_CLIENT_ID')!;
 
-    this.clientSecret = this.configService.getOrThrow<string>(
+    this.clientSecret = this.configService.get<string>(
       'COGNITO_CLIENT_SECRET',
-    );
+    )!;
 
     this.cognitoClient = new CognitoIdentityProviderClient({
       region,
     });
   }
 
+  // =========================
+  // Register
+  // =========================
+
   async register(registerDto: RegisterDto) {
-    const secretHash = this.generateSecretHash(registerDto.email);
+    const { firstName, middleName, lastName, email, password } = registerDto;
+
+    const secretHash = this.generateSecretHash(email);
 
     const command = new SignUpCommand({
       ClientId: this.clientId,
-      Username: registerDto.email,
-      Password: registerDto.password,
+      Username: email,
+      Password: password,
       SecretHash: secretHash,
       UserAttributes: [
         {
           Name: 'email',
-          Value: registerDto.email,
+          Value: email,
+        },
+        {
+          Name: 'given_name',
+          Value: firstName,
+        },
+        {
+          Name: 'family_name',
+          Value: lastName,
         },
       ],
     });
 
-    const result = await this.cognitoClient.send(command);
+    let result: SignUpCommandOutput;
+
+    try {
+      result = await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Unable to create account.');
+    }
+
+    if (!result.UserSub) {
+      throw new UnauthorizedException('Unable to create Cognito user.');
+    }
+
+    const now = new Date();
 
     await this.dbService.db.insert(users).values({
-      id: result.UserSub!,
-      firstName: registerDto.firstName,
-      middleName: registerDto.middleName,
-      lastName: registerDto.lastName,
-      email: registerDto.email,
+      id: result.UserSub,
+      firstName,
+      middleName: middleName ?? null,
+      lastName,
+      email,
       role: 'student',
       status: 'pending',
-      joinedAt: new Date(),
-      updatedAt: new Date(),
+      profilePhotoUrl: null,
+      joinedAt: now,
+      updatedAt: now,
     });
 
     return {
-      userSub: result.UserSub,
-      userConfirmed: result.UserConfirmed,
+      message:
+        'Registration successful. Please check your email to confirm your account.',
     };
   }
 
-  async confirmEmail(confirmEmailDto: ConfirmEmailDto) {
-    const secretHash = this.generateSecretHash(confirmEmailDto.email);
+  // =========================
+  // Confirm Email
+  // =========================
 
-    await this.cognitoClient.send(
-      new ConfirmSignUpCommand({
-        ClientId: this.clientId,
-        Username: confirmEmailDto.email,
-        ConfirmationCode: confirmEmailDto.code,
-        SecretHash: secretHash,
-      }),
-    );
+  async confirmEmail(confirmEmailDto: ConfirmEmailDto) {
+    const { email, code } = confirmEmailDto;
+
+    const secretHash = this.generateSecretHash(email);
+
+    const command = new ConfirmSignUpCommand({
+      ClientId: this.clientId,
+      Username: email,
+      ConfirmationCode: code,
+      SecretHash: secretHash,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'This account cannot be confirmed.');
+    }
 
     await this.dbService.db
       .update(users)
@@ -108,72 +156,141 @@ export class AuthService {
         status: 'active',
         updatedAt: new Date(),
       })
-      .where(eq(users.email, confirmEmailDto.email));
+      .where(eq(users.email, email));
 
     return {
       message: 'Email confirmed successfully.',
     };
   }
 
-  async login(loginDto: LoginDto) {
+  // =========================
+  // Resend Confirmation Code
+  // =========================
+
+  async resendConfirmationCode(resendConfirmationDto: ResendConfirmationDto) {
+    const { email } = resendConfirmationDto;
+
+    // Same response whether or not the account exists, so emails can't be probed.
+    const genericResponse = {
+      message:
+        'If the account exists and is not confirmed, a new code has been sent.',
+    };
+
     const user = await this.dbService.db
       .select()
       .from(users)
-      .where(eq(users.email, loginDto.email))
+      .where(eq(users.email, email))
       .limit(1);
 
-    if (!user[0]) {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        message: 'No account found with this email.',
-      });
+    if (!user.length || user[0].status !== 'pending') {
+      return genericResponse;
     }
 
+    const command = new ResendConfirmationCodeCommand({
+      ClientId: this.clientId,
+      Username: email,
+      SecretHash: this.generateSecretHash(email),
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      const name = error instanceof Error ? error.name : '';
+
+      if (
+        name === 'UserNotFoundException' ||
+        name === 'InvalidParameterException'
+      ) {
+        return genericResponse;
+      }
+
+      this.handleCognitoError(error, 'Unable to send confirmation code.');
+    }
+
+    return genericResponse;
+  }
+
+  // =========================
+  // Login
+  // =========================
+
+  async login(loginDto: LoginDto) {
+    const { email, password } = loginDto;
+
+    const user = await this.dbService.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (!user.length) {
+      throw new UnauthorizedException('Incorrect email or password.');
+    }
+
+    // Status checks happen AFTER the password is verified, so nobody can
+    // learn an account's state (pending/inactive) without the right password.
+    const secretHash = this.generateSecretHash(email);
+
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: this.clientId,
+      AuthParameters: {
+        USERNAME: email,
+        PASSWORD: password,
+        SECRET_HASH: secretHash,
+      },
+    });
+
+    let result: InitiateAuthCommandOutput;
+
+    try {
+      result = await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Incorrect email or password.');
+    }
+
+    const authenticationResult = result.AuthenticationResult;
+
+    if (!authenticationResult?.AccessToken) {
+      throw new UnauthorizedException('Authentication failed.');
+    }
+
+    // Password is correct at this point, so it is safe to reveal the status.
     if (user[0].status === 'pending') {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        status: 'pending',
-        message: 'Please verify your email before logging in.',
-      });
+      throw new ForbiddenException(
+        'Please confirm your email before signing in.',
+      );
     }
 
     if (user[0].status === 'inactive') {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        status: 'inactive',
-        message: 'Account is not active.',
-      });
+      throw new UnauthorizedException('Your account has been deactivated.');
     }
 
-    const secretHash = this.generateSecretHash(loginDto.email);
-
-    const result = await this.cognitoClient.send(
-      new InitiateAuthCommand({
-        ClientId: this.clientId,
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        AuthParameters: {
-          USERNAME: loginDto.email,
-          PASSWORD: loginDto.password,
-          SECRET_HASH: secretHash,
-        },
-      }),
-    );
-
     return {
-      accessToken: result.AuthenticationResult?.AccessToken,
-      idToken: result.AuthenticationResult?.IdToken,
-      refreshToken: result.AuthenticationResult?.RefreshToken,
-      expiresIn: result.AuthenticationResult?.ExpiresIn,
-      tokenType: result.AuthenticationResult?.TokenType,
+      accessToken: authenticationResult.AccessToken,
+      idToken: authenticationResult.IdToken,
+      refreshToken: authenticationResult.RefreshToken,
+      expiresIn: authenticationResult.ExpiresIn,
+      tokenType: authenticationResult.TokenType,
     };
   }
 
+  // =========================
+  // Get Current User
+  // =========================
+
   async getMe(accessToken: string) {
-    const result = await this.cognitoClient.send(
-      new GetUserCommand({
-        AccessToken: accessToken,
-      }),
-    );
+    const command = new GetUserCommand({
+      AccessToken: accessToken,
+    });
+
+    let result: GetUserCommandOutput;
+
+    try {
+      result = await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Invalid or expired access token.');
+    }
 
     const sub = result.UserAttributes?.find(
       (attribute) => attribute.Name === 'sub',
@@ -185,136 +302,302 @@ export class AuthService {
       )?.Value === 'true';
 
     if (!sub) {
-      throw new UnauthorizedException('Invalid user.');
+      throw new UnauthorizedException('Unable to identify authenticated user.');
     }
 
     const user = await this.dbService.db
-      .select({
-        id: users.id,
-        firstName: users.firstName,
-        middleName: users.middleName,
-        lastName: users.lastName,
-        email: users.email,
-        role: users.role,
-        status: users.status,
-        profilePhotoUrl: users.profilePhotoUrl,
-        joinedAt: users.joinedAt,
-        updatedAt: users.updatedAt,
-      })
+      .select()
       .from(users)
       .where(eq(users.id, sub))
       .limit(1);
 
-    if (!user[0]) {
-      throw new UnauthorizedException('User not found.');
+    if (!user.length) {
+      throw new UnauthorizedException('User account not found.');
+    }
+
+    const [profilePhotoUrl, stats] = await Promise.all([
+      user[0].profilePhotoUrl
+        ? this.s3Service.getPresignedUrl(user[0].profilePhotoUrl)
+        : Promise.resolve(null),
+      this.getUserStats(sub),
+    ]);
+
+    return {
+      id: user[0].id,
+      firstName: user[0].firstName,
+      middleName: user[0].middleName,
+      lastName: user[0].lastName,
+      email: user[0].email,
+      role: user[0].role,
+      status: user[0].status,
+      profilePhotoUrl,
+      joinedAt: user[0].joinedAt,
+      updatedAt: user[0].updatedAt,
+      emailVerified,
+      stats,
+    };
+  }
+
+  // =========================
+  // Logout
+  // =========================
+
+  async logout(accessToken: string) {
+    const command = new GlobalSignOutCommand({
+      AccessToken: accessToken,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Invalid or expired access token.');
     }
 
     return {
-      ...user[0],
-      profilePhotoUrl: user[0].profilePhotoUrl
-        ? await this.s3Service.getPresignedUrl(user[0].profilePhotoUrl)
-        : null,
-      emailVerified,
+      message: 'Signed out successfully.',
     };
   }
 
-  async logout(accessToken: string) {
-    await this.cognitoClient.send(
-      new GlobalSignOutCommand({
-        AccessToken: accessToken,
-      }),
-    );
-
-    return {
-      message: 'Logged out successfully.',
-    };
-  }
+  // =========================
+  // Forgot Password
+  // =========================
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-    const secretHash = this.generateSecretHash(forgotPasswordDto.email);
+    const { email } = forgotPasswordDto;
 
-    await this.cognitoClient.send(
-      new ForgotPasswordCommand({
-        ClientId: this.clientId,
-        Username: forgotPasswordDto.email,
-        SecretHash: secretHash,
-      }),
-    );
+    const secretHash = this.generateSecretHash(email);
+
+    const command = new ForgotPasswordCommand({
+      ClientId: this.clientId,
+      Username: email,
+      SecretHash: secretHash,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      // Do not reveal whether an email is registered.
+      if (error instanceof Error && error.name === 'UserNotFoundException') {
+        return {
+          message:
+            'If the account exists, a password reset code has been sent.',
+        };
+      }
+
+      this.handleCognitoError(error, 'Unable to send password reset code.');
+    }
 
     return {
-      message: 'Password reset code sent successfully.',
+      message: 'If the account exists, a password reset code has been sent.',
     };
   }
 
-  async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const secretHash = this.generateSecretHash(resetPasswordDto.email);
+  // =========================
+  // Reset Password
+  // =========================
 
-    await this.cognitoClient.send(
-      new ConfirmForgotPasswordCommand({
-        ClientId: this.clientId,
-        Username: resetPasswordDto.email,
-        ConfirmationCode: resetPasswordDto.code,
-        Password: resetPasswordDto.newPassword,
-        SecretHash: secretHash,
-      }),
-    );
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { email, code, newPassword } = resetPasswordDto;
+
+    const secretHash = this.generateSecretHash(email);
+
+    const command = new ConfirmForgotPasswordCommand({
+      ClientId: this.clientId,
+      Username: email,
+      ConfirmationCode: code,
+      Password: newPassword,
+      SecretHash: secretHash,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Unable to reset password.');
+    }
 
     return {
       message: 'Password reset successfully.',
     };
   }
 
+  // =========================
+  // Refresh Token
+  // =========================
+
   async refreshToken(refreshToken: string, email: string) {
     const user = await this.dbService.db
-      .select({
-        id: users.id,
-      })
+      .select()
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
 
-    if (!user[0]) {
-      throw new UnauthorizedException('User not found.');
+    if (!user.length) {
+      throw new UnauthorizedException('User account not found.');
     }
+
+    if (user[0].status !== 'active') {
+      throw new UnauthorizedException('Your account is not active.');
+    }
+
+    console.log(`[refresh] ${new Date().toISOString()} user=${user[0].id}`);
 
     const secretHash = this.generateSecretHash(user[0].id);
 
-    const result = await this.cognitoClient.send(
-      new InitiateAuthCommand({
-        ClientId: this.clientId,
-        AuthFlow: 'REFRESH_TOKEN_AUTH',
-        AuthParameters: {
-          REFRESH_TOKEN: refreshToken,
-          SECRET_HASH: secretHash,
-        },
-      }),
-    );
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      ClientId: this.clientId,
+      AuthParameters: {
+        REFRESH_TOKEN: refreshToken,
+        SECRET_HASH: secretHash,
+      },
+    });
+
+    let result: InitiateAuthCommandOutput;
+
+    try {
+      result = await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Unable to refresh session.');
+    }
+
+    const authenticationResult = result.AuthenticationResult;
+
+    if (!authenticationResult?.AccessToken) {
+      throw new UnauthorizedException('Unable to refresh session.');
+    }
 
     return {
-      accessToken: result.AuthenticationResult?.AccessToken,
-      idToken: result.AuthenticationResult?.IdToken,
-      expiresIn: result.AuthenticationResult?.ExpiresIn,
-      tokenType: result.AuthenticationResult?.TokenType,
+      accessToken: authenticationResult.AccessToken,
+      idToken: authenticationResult.IdToken,
+      expiresIn: authenticationResult.ExpiresIn,
+      tokenType: authenticationResult.TokenType,
     };
   }
+
+  // =========================
+  // Change Password
+  // =========================
 
   async changePassword(
     accessToken: string,
     oldPassword: string,
     newPassword: string,
   ) {
-    await this.cognitoClient.send(
-      new ChangePasswordCommand({
-        AccessToken: accessToken,
-        PreviousPassword: oldPassword,
-        ProposedPassword: newPassword,
-      }),
-    );
+    const command = new ChangePasswordCommand({
+      AccessToken: accessToken,
+      PreviousPassword: oldPassword,
+      ProposedPassword: newPassword,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      this.handleCognitoError(error, 'Current password is incorrect.');
+    }
 
     return {
       message: 'Password changed successfully.',
     };
   }
+
+  // =========================
+  // User Stats
+  // =========================
+
+  private async getUserStats(userId: string): Promise<UserStatsDto> {
+    const [[courses], [uploads], [downloads]] = await Promise.all([
+      // Courses the user has joined
+      this.dbService.db
+        .select({ total: count() })
+        .from(enrollments)
+        .where(eq(enrollments.userId, userId)),
+
+      // Resources the user has uploaded
+      this.dbService.db
+        .select({ total: count() })
+        .from(resources)
+        .where(eq(resources.uploadedById, userId)),
+
+      // Total downloads across all of the user's resources
+      this.dbService.db
+        .select({
+          total: sql<number>`coalesce(sum(${resources.downloads}), 0)`.mapWith(
+            Number,
+          ),
+        })
+        .from(resources)
+        .where(eq(resources.uploadedById, userId)),
+    ]);
+
+    return {
+      coursesJoined: courses.total,
+      resourcesUploaded: uploads.total,
+      totalDownloads: downloads.total,
+    };
+  }
+
+  // =========================
+  // Cognito Error Mapping
+  // =========================
+
+  /**
+   * Converts AWS Cognito errors into proper HTTP errors so the client
+   * gets a clear message instead of a generic 500.
+   * `notAuthorizedMessage` is used for NotAuthorizedException because its
+   * meaning depends on the operation (wrong password, bad token, etc.).
+   */
+  private handleCognitoError(
+    error: unknown,
+    notAuthorizedMessage: string,
+  ): never {
+    const name = error instanceof Error ? error.name : '';
+    const message = error instanceof Error ? error.message : '';
+
+    switch (name) {
+      case 'InvalidPasswordException':
+        throw new BadRequestException(message);
+
+      case 'InvalidParameterException':
+        throw new BadRequestException(message);
+
+      case 'UsernameExistsException':
+        throw new ConflictException(
+          'An account with this email already exists.',
+        );
+
+      case 'CodeMismatchException':
+        throw new BadRequestException('Invalid verification code.');
+
+      case 'ExpiredCodeException':
+        throw new BadRequestException(
+          'Verification code has expired. Please request a new one.',
+        );
+
+      case 'NotAuthorizedException':
+      case 'UserNotFoundException':
+        throw new UnauthorizedException(notAuthorizedMessage);
+
+      case 'UserNotConfirmedException':
+        throw new ForbiddenException(
+          'Please confirm your email before signing in.',
+        );
+
+      case 'LimitExceededException':
+      case 'TooManyRequestsException':
+      case 'TooManyFailedAttemptsException':
+        throw new HttpException(
+          'Too many attempts. Please try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+
+      default:
+        throw error;
+    }
+  }
+
+  // =========================
+  // Secret Hash
+  // =========================
 
   private generateSecretHash(username: string): string {
     return createHmac('sha256', this.clientSecret)

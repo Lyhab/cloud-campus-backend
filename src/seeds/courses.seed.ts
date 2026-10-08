@@ -1,12 +1,11 @@
 import 'dotenv/config';
 
 import { randomUUID } from 'crypto';
-
 import { Client } from 'pg';
-
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { inArray } from 'drizzle-orm';
 
-import { courses } from '../db/schema';
+import { courses, enrollments } from '../db/schema';
 
 type SeedCourse = {
   id: string;
@@ -272,6 +271,27 @@ const seedCoursesData: SeedCourse[] = [
   },
 ];
 
+const STUDENT_ID = '99be6468-e071-7070-6895-c7f07bf2aa65';
+
+const ENROLLED_COURSE_CODES = [
+  'COMP809',
+  'COMP814',
+  'COMP820',
+  'COMP821',
+  'COMP822',
+  'COMP828',
+  'COMP838',
+  'INFS803',
+  'COMP810',
+  'COMP813',
+  'COMP806',
+  'COMP800',
+  'COMP816',
+  'COMP825',
+  'COMP826',
+  'COMP842',
+];
+
 export async function seedCourses() {
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
@@ -280,11 +300,37 @@ export async function seedCourses() {
   await client.connect();
 
   try {
-    console.log('🌱📚📚 Seeding courses...');
+    console.log('🌱📚 Seeding courses...');
 
     const db = drizzle(client);
 
     await db.insert(courses).values(seedCoursesData);
+
+    const selectedCourses = await db
+      .select({
+        id: courses.id,
+        code: courses.code,
+      })
+      .from(courses)
+      .where(inArray(courses.code, ENROLLED_COURSE_CODES));
+
+    if (selectedCourses.length !== ENROLLED_COURSE_CODES.length) {
+      const foundCodes = new Set(selectedCourses.map((course) => course.code));
+
+      const missingCourses = ENROLLED_COURSE_CODES.filter(
+        (code) => !foundCodes.has(code),
+      );
+
+      throw new Error(`Missing courses: ${missingCourses.join(', ')}`);
+    }
+
+    const enrollmentValues = selectedCourses.map((course) => ({
+      userId: STUDENT_ID,
+      courseId: course.id,
+      joinedAt: new Date('2026-02-16T00:00:00Z'),
+    }));
+
+    await db.insert(enrollments).values(enrollmentValues);
   } finally {
     await client.end();
   }

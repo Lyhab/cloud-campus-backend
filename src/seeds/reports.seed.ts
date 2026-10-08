@@ -78,6 +78,20 @@ const seedReportsData: SeedReport[] = [
       'The downloadable file does not appear to match the resource description.',
     status: 'dismissed',
   },
+  {
+    resourceTitle: 'AWS EC2 and VPC Notes',
+    reporter: 'lucas.harris@cloudcampus.test',
+    reason:
+      'The VPC subnet and routing explanations seem outdated compared to the current AWS documentation.',
+    status: 'pending',
+  },
+  {
+    resourceTitle: 'Search Algorithms Summary',
+    reporter: 'sophia.moore@cloudcampus.test',
+    reason:
+      'The heuristic examples for A* are unclear and the complexity notes look incorrect.',
+    status: 'pending',
+  },
 ];
 
 export async function seedReports() {
@@ -124,15 +138,19 @@ export async function seedReports() {
     const now = new Date();
 
     const reportRows: (typeof reports.$inferInsert)[] = seedReportsData.map(
-      (report) => ({
-        id: randomUUID(),
-        resourceId: get(resourceId, report.resourceTitle),
-        reporterId: get(userId, report.reporter),
-        reason: report.reason,
-        status: report.status,
-        createdAt: now,
-        updatedAt: now,
-      }),
+      (report, index) => {
+        const createdAt = new Date(now.getTime() - index * 24 * 60 * 60 * 1000);
+
+        return {
+          id: randomUUID(),
+          resourceId: get(resourceId, report.resourceTitle),
+          reporterId: get(userId, report.reporter),
+          reason: report.reason,
+          status: report.status,
+          createdAt,
+          updatedAt: createdAt,
+        };
+      },
     );
 
     await db.insert(reports).values(reportRows);

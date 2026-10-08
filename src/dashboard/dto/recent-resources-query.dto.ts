@@ -1,4 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class RecentResourcesQueryDto {
   @ApiPropertyOptional({
@@ -7,6 +9,8 @@ export class RecentResourcesQueryDto {
     default: 'newest',
     description: 'Sort order (default newest)',
   })
+  @IsOptional()
+  @IsIn(['newest', 'oldest'])
   sort?: 'newest' | 'oldest';
 
   @ApiPropertyOptional({
@@ -14,5 +18,10 @@ export class RecentResourcesQueryDto {
     default: 5,
     description: 'Number of recent resources to return (default 5)',
   })
-  limit?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

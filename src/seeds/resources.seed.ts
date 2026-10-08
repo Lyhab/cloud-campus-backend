@@ -1,7 +1,11 @@
 import 'dotenv/config';
+
 import { randomUUID } from 'crypto';
+
 import { Client } from 'pg';
+
 import { drizzle } from 'drizzle-orm/node-postgres';
+
 import { bookmarks, courses, ratings, resources, users } from '../db/schema';
 
 type SeedResource = {
@@ -31,9 +35,19 @@ const seedResourcesData: SeedResource[] = [
       { email: 'emily.taylor@cloudcampus.test', value: 5 },
       { email: 'isabella.white@cloudcampus.test', value: 5 },
       { email: 'lucas.harris@cloudcampus.test', value: 4 },
+      { email: 'mia.martin@cloudcampus.test', value: 5 },
+      { email: 'sophia.moore@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
+      { email: 'olivia.davis@cloudcampus.test', value: 5 },
+      { email: 'benjamin.jackson@cloudcampus.test', value: 5 },
     ],
-    bookmarks: ['emily.taylor@cloudcampus.test', 'mia.martin@cloudcampus.test'],
+    bookmarks: [
+      'emily.taylor@cloudcampus.test',
+      'mia.martin@cloudcampus.test',
+      'lyhabrithyny@gmail.com',
+    ],
   },
+
   {
     title: 'Week 4 Cloud Architecture',
     description: 'Slides on scalable cloud architecture patterns.',
@@ -43,24 +57,37 @@ const seedResourcesData: SeedResource[] = [
     fileSizeMb: '8.10',
     downloads: 198,
     status: 'approved',
-    ratings: [{ email: 'ethan.thompson@cloudcampus.test', value: 4 }],
+    ratings: [
+      { email: 'ethan.thompson@cloudcampus.test', value: 4 },
+      { email: 'emily.taylor@cloudcampus.test', value: 5 },
+      { email: 'isabella.white@cloudcampus.test', value: 5 },
+      { email: 'lucas.harris@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
+      { email: 'olivia.davis@cloudcampus.test', value: 4 },
+    ],
     bookmarks: [],
   },
+
   {
     title: 'Machine Learning Revision Notes',
     description: 'Summary of supervised and unsupervised methods.',
     courseCode: 'COMP809',
-    uploader: 'charlotte.garcia@cloudcampus.test',
+    uploader: 'lyhabrithyny@gmail.com',
     fileType: 'pdf',
     fileSizeMb: '3.20',
     downloads: 260,
     status: 'approved',
     ratings: [
-      { email: 'emily.taylor@cloudcampus.test', value: 5 },
-      { email: 'william.miller@cloudcampus.test', value: 4 },
+      { email: 'mia.martin@cloudcampus.test', value: 5 },
+      { email: 'sophia.moore@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
+      { email: 'olivia.davis@cloudcampus.test', value: 5 },
+      { email: 'benjamin.jackson@cloudcampus.test', value: 5 },
+      { email: 'ethan.thompson@cloudcampus.test', value: 4 },
     ],
     bookmarks: ['william.miller@cloudcampus.test'],
   },
+
   {
     title: 'Data Mining Practice Dataset',
     description: 'Sample dataset for the clustering lab.',
@@ -71,8 +98,9 @@ const seedResourcesData: SeedResource[] = [
     downloads: 75,
     status: 'approved',
     ratings: [{ email: 'jack.lewis@cloudcampus.test', value: 3 }],
-    bookmarks: [],
+    bookmarks: ['lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'Network Security Lab Guide',
     description: 'Step-by-step guide for the packet analysis lab.',
@@ -85,6 +113,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'olivia.davis@cloudcampus.test', value: 4 }],
     bookmarks: ['olivia.davis@cloudcampus.test'],
   },
+
   {
     title: 'Cryptography Formula Sheet',
     description: 'Key algorithms and formulas for the exam.',
@@ -97,6 +126,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Software Architecture Patterns',
     description: 'Overview of layered, microservice and event-driven styles.',
@@ -109,6 +139,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Outdated Lecture Recording Notes',
     description: 'Rejected: content does not match the course.',
@@ -121,11 +152,12 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Deep Learning Lab 1 Notebook',
     description: 'CNN basics with worked examples.',
     courseCode: 'COMP838',
-    uploader: 'emily.taylor@cloudcampus.test',
+    uploader: 'lyhabrithyny@gmail.com',
     fileType: 'pdf',
     fileSizeMb: '2.10',
     downloads: 140,
@@ -136,6 +168,7 @@ const seedResourcesData: SeedResource[] = [
     ],
     bookmarks: ['mia.martin@cloudcampus.test'],
   },
+
   {
     title: 'Backpropagation Explained',
     description: 'Step-by-step derivation.',
@@ -148,6 +181,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'olivia.davis@cloudcampus.test', value: 5 }],
     bookmarks: [],
   },
+
   {
     title: 'Text Preprocessing Guide',
     description: 'Tokenisation, stemming and stop words.',
@@ -158,8 +192,9 @@ const seedResourcesData: SeedResource[] = [
     downloads: 61,
     status: 'approved',
     ratings: [{ email: 'ethan.thompson@cloudcampus.test', value: 4 }],
-    bookmarks: ['ethan.thompson@cloudcampus.test'],
+    bookmarks: ['ethan.thompson@cloudcampus.test', 'lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'Sentiment Analysis Dataset',
     description: 'Labelled reviews for practice.',
@@ -172,6 +207,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'sophia.moore@cloudcampus.test', value: 3 }],
     bookmarks: [],
   },
+
   {
     title: 'Image Filtering Slides',
     description: 'Convolution and edge detection.',
@@ -184,6 +220,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'jack.lewis@cloudcampus.test', value: 4 }],
     bookmarks: [],
   },
+
   {
     title: 'Information Security Exam Prep',
     description: 'Past paper questions and answers.',
@@ -195,13 +232,21 @@ const seedResourcesData: SeedResource[] = [
     status: 'approved',
     ratings: [
       { email: 'emily.taylor@cloudcampus.test', value: 5 },
+      { email: 'isabella.white@cloudcampus.test', value: 5 },
+      { email: 'lucas.harris@cloudcampus.test', value: 4 },
+      { email: 'mia.martin@cloudcampus.test', value: 5 },
+      { email: 'sophia.moore@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
+      { email: 'olivia.davis@cloudcampus.test', value: 5 },
       { email: 'benjamin.jackson@cloudcampus.test', value: 5 },
     ],
     bookmarks: [
       'emily.taylor@cloudcampus.test',
       'benjamin.jackson@cloudcampus.test',
+      'lyhabrithyny@gmail.com',
     ],
   },
+
   {
     title: 'Usability Heuristics Summary',
     description: "Nielsen's heuristics with examples.",
@@ -214,6 +259,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'isabella.white@cloudcampus.test', value: 4 }],
     bookmarks: [],
   },
+
   {
     title: 'R Programming Cheat Sheet',
     description: 'Common data manipulation commands.',
@@ -227,8 +273,9 @@ const seedResourcesData: SeedResource[] = [
       { email: 'michael.brown@cloudcampus.test', value: 5 },
       { email: 'lucas.harris@cloudcampus.test', value: 4 },
     ],
-    bookmarks: ['lucas.harris@cloudcampus.test'],
+    bookmarks: ['lucas.harris@cloudcampus.test', 'lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'Cybercrime Case Studies',
     description: 'Recent incidents and analysis.',
@@ -241,6 +288,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Formal Methods Notation Guide',
     description: 'Z notation basics.',
@@ -253,25 +301,31 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'charlotte.garcia@cloudcampus.test', value: 3 }],
     bookmarks: [],
   },
+
   {
     title: 'AWS EC2 and VPC Notes',
     description: 'Networking and compute fundamentals.',
     courseCode: 'INFS803',
-    uploader: 'olivia.davis@cloudcampus.test',
+    uploader: 'lyhabrithyny@gmail.com',
     fileType: 'pdf',
     fileSizeMb: '3.00',
     downloads: 275,
     status: 'approved',
     ratings: [
       { email: 'emily.taylor@cloudcampus.test', value: 5 },
-      { email: 'ethan.thompson@cloudcampus.test', value: 5 },
+      { email: 'isabella.white@cloudcampus.test', value: 5 },
+      { email: 'lucas.harris@cloudcampus.test', value: 4 },
       { email: 'sophia.moore@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
+      { email: 'olivia.davis@cloudcampus.test', value: 5 },
+      { email: 'benjamin.jackson@cloudcampus.test', value: 5 },
     ],
     bookmarks: [
       'emily.taylor@cloudcampus.test',
       'sophia.moore@cloudcampus.test',
     ],
   },
+
   {
     title: 'Serverless Architecture Slides',
     description: 'Lambda, API Gateway and DynamoDB.',
@@ -282,13 +336,14 @@ const seedResourcesData: SeedResource[] = [
     downloads: 152,
     status: 'approved',
     ratings: [{ email: 'mia.martin@cloudcampus.test', value: 4 }],
-    bookmarks: [],
+    bookmarks: ['lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'Big Data Pipeline Diagram',
     description: 'ETL flow for the assignment.',
     courseCode: 'COMP810',
-    uploader: 'emily.taylor@cloudcampus.test',
+    uploader: 'lyhabrithyny@gmail.com',
     fileType: 'pdf',
     fileSizeMb: '1.60',
     downloads: 58,
@@ -296,21 +351,29 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'jack.lewis@cloudcampus.test', value: 4 }],
     bookmarks: ['jack.lewis@cloudcampus.test'],
   },
+
   {
     title: 'Search Algorithms Summary',
     description: 'A*, BFS, DFS and heuristics.',
     courseCode: 'COMP813',
-    uploader: 'lucas.harris@cloudcampus.test',
+    uploader: 'lyhabrithyny@gmail.com',
     fileType: 'pdf',
     fileSizeMb: '1.00',
     downloads: 132,
     status: 'approved',
     ratings: [
+      { email: 'emily.taylor@cloudcampus.test', value: 5 },
+      { email: 'isabella.white@cloudcampus.test', value: 5 },
+      { email: 'lucas.harris@cloudcampus.test', value: 4 },
+      { email: 'mia.martin@cloudcampus.test', value: 5 },
+      { email: 'sophia.moore@cloudcampus.test', value: 4 },
+      { email: 'michael.brown@cloudcampus.test', value: 5 },
       { email: 'olivia.davis@cloudcampus.test', value: 5 },
-      { email: 'william.miller@cloudcampus.test', value: 4 },
+      { email: 'benjamin.jackson@cloudcampus.test', value: 5 },
     ],
-    bookmarks: [],
+    bookmarks: ['olivia.davis@cloudcampus.test', 'lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'IoT Sensor Data Sample',
     description: 'Sample readings for the lab.',
@@ -323,6 +386,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Genetic Algorithm Notes',
     description: 'Selection, crossover and mutation.',
@@ -335,6 +399,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [{ email: 'benjamin.jackson@cloudcampus.test', value: 4 }],
     bookmarks: [],
   },
+
   {
     title: 'Android App Starter Project',
     description: 'Template for the mobile assignment.',
@@ -345,8 +410,9 @@ const seedResourcesData: SeedResource[] = [
     downloads: 84,
     status: 'approved',
     ratings: [{ email: 'isabella.white@cloudcampus.test', value: 5 }],
-    bookmarks: ['isabella.white@cloudcampus.test'],
+    bookmarks: ['isabella.white@cloudcampus.test', 'lyhabrithyny@gmail.com'],
   },
+
   {
     title: 'Blockchain Consensus Slides',
     description: 'PoW, PoS and PBFT compared.',
@@ -359,6 +425,7 @@ const seedResourcesData: SeedResource[] = [
     ratings: [],
     bookmarks: [],
   },
+
   {
     title: 'Agile Sprint Planning Template',
     description: 'Backlog and sprint board template.',
@@ -374,37 +441,59 @@ const seedResourcesData: SeedResource[] = [
 ];
 
 export async function seedResources() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
+
   await client.connect();
 
   try {
     console.log('🌱📄📄 Seeding resources...');
+
     const db = drizzle(client);
 
     const courseId = new Map(
       (
-        await db.select({ id: courses.id, code: courses.code }).from(courses)
+        await db
+          .select({
+            id: courses.id,
+            code: courses.code,
+          })
+          .from(courses)
       ).map((c) => [c.code, c.id]),
     );
+
     const userId = new Map(
-      (await db.select({ id: users.id, email: users.email }).from(users)).map(
-        (u) => [u.email, u.id],
-      ),
+      (
+        await db
+          .select({
+            id: users.id,
+            email: users.email,
+          })
+          .from(users)
+      ).map((u) => [u.email, u.id]),
     );
 
     const get = (map: Map<string, string>, key: string) => {
       const value = map.get(key);
-      if (!value) throw new Error(`Seed lookup failed: ${key}`);
+
+      if (!value) {
+        throw new Error(`Seed lookup failed: ${key}`);
+      }
+
       return value;
     };
 
     const now = new Date();
+
     const ratingRows: (typeof ratings.$inferInsert)[] = [];
     const bookmarkRows: (typeof bookmarks.$inferInsert)[] = [];
 
     const resourceRows = seedResourcesData.map((r) => {
       const id = randomUUID();
+
       const count = r.ratings.length;
+
       const avg = count
         ? (r.ratings.reduce((sum, x) => sum + x.value, 0) / count).toFixed(2)
         : '0.00';
@@ -418,6 +507,7 @@ export async function seedResources() {
           updatedAt: now,
         }),
       );
+
       r.bookmarks.forEach((email) =>
         bookmarkRows.push({
           userId: get(userId, email),
@@ -445,8 +535,14 @@ export async function seedResources() {
     });
 
     await db.insert(resources).values(resourceRows);
-    if (ratingRows.length) await db.insert(ratings).values(ratingRows);
-    if (bookmarkRows.length) await db.insert(bookmarks).values(bookmarkRows);
+
+    if (ratingRows.length) {
+      await db.insert(ratings).values(ratingRows);
+    }
+
+    if (bookmarkRows.length) {
+      await db.insert(bookmarks).values(bookmarkRows);
+    }
   } finally {
     await client.end();
   }

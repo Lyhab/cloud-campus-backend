@@ -1,5 +1,6 @@
 import { configure as serverlessExpress } from '@codegenie/serverless-express';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
@@ -17,7 +18,7 @@ type AsyncHandler = (
 let cachedHandler: AsyncHandler | undefined;
 
 async function bootstrap(): Promise<AsyncHandler> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   setupApp(app);
   await app.init();

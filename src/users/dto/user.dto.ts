@@ -1,4 +1,15 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class UserStatsDto {
+  @ApiProperty({ example: 16 })
+  coursesJoined!: number;
+
+  @ApiProperty({ example: 5 })
+  resourcesUploaded!: number;
+
+  @ApiProperty({ example: 142 })
+  totalDownloads!: number;
+}
 
 export class UserDto {
   @ApiProperty()
@@ -36,4 +47,7 @@ export class UserDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: UserStatsDto })
+  stats?: UserStatsDto;
 }

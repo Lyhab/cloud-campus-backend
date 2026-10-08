@@ -20,7 +20,7 @@ export class DashboardService {
   constructor(private readonly db: DbService) {}
 
   private parseLimit(
-    value: string | undefined,
+    value: string | number | undefined,
     defaultValue: number,
     max = 100,
   ) {
@@ -279,7 +279,8 @@ export class DashboardService {
         ),
       )
       .where(eq(enrollments.userId, userId))
-      .groupBy(courses.id, courses.code, courses.name, courses.description);
+      .groupBy(courses.id, courses.code, courses.name, courses.description)
+      .limit(2);
 
     return rows;
   }
