@@ -1,5 +1,7 @@
 # compiled output
 /dist
+/dist-lambda
+/cloud-campus-backend-lambda.zip
 /node_modules
 /build
 

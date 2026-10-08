@@ -10,7 +10,8 @@ export class DbService implements OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     this.pool = new Pool({
-      connectionString: this.configService.get<string>('DATABASE_URL'),
+      connectionString: this.configService.getOrThrow<string>('DATABASE_URL'),
+      connectionTimeoutMillis: 10_000,
     });
 
     this.db = drizzle(this.pool);
