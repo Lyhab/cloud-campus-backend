@@ -10,8 +10,8 @@ export class AppService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b1020" />
   <title>Cloud Campus API</title>
-  <link rel="icon" type="image/png" href="/cloud-campus-logo.png?v=2" />
-  <link rel="shortcut icon" href="/cloud-campus-logo.png?v=2" />
+  <link rel="icon" type="image/png" href="/cloud-campus-logo.png?v=3" />
+  <link rel="shortcut icon" href="/cloud-campus-logo.png?v=3" />
 
   <style>
     * { box-sizing: border-box; }

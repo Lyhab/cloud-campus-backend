@@ -39,3 +39,7 @@ await cp(
   resolve(outputDirectory, 'node_modules/swagger-ui-dist'),
   { recursive: true },
 );
+
+await cp(resolve(projectRoot, 'public'), resolve(outputDirectory, 'public'), {
+  recursive: true,
+});
