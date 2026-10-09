@@ -1,8 +1,12 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { join } from 'node:path';
 
-export function setupApp(app: INestApplication): void {
+export function setupApp(app: NestExpressApplication): void {
+  app.useStaticAssets(join(process.cwd(), 'public'));
+
   app.use(cookieParser());
 
   app.useGlobalPipes(
